@@ -1,14 +1,14 @@
 ---
 status: active
-version: 0.4.0
-last_updated: 2026-06-23
+version: 0.5.1
+last_updated: 2026-06-24
 owners: [Agung Prasetyo (solo-dev / admin)]
 related: [README.md, AGENTS.md, TASK.md]
 ---
 
 # PLANNING.md — Shylv Manager Bot Discord
 
-> A Discord DM-based bot for scanlation team management: tracking completed chapters and managing staff balance/payment records. Status: Phase 2 (Dynamic Management). Read this first.
+> A Discord DM-based bot for scanlation team management: tracking completed chapters and managing staff balance/payment records. Status: Phase 2.5 (Command Refactor & Dashboard). Read this first.
 > Human docs: README.md • Agent rules: AGENTS.md • Tasks: TASK.md
 
 ## Vision & Problem
@@ -17,19 +17,22 @@ Scanlation teams lack a simple, centralized way to track which chapters have bee
 
 **Target users:** A scanlation team admin who manages staff payments/credits via Discord DMs. Staff members who want to check their own records.
 
-**Value proposition:** A Discord bot that lives in DMs, allowing the admin to log completed chapters and automatically calculate accumulated balance (point + bonus), while giving staff members self-service access to view their own stats and history. The bot provides an auditable, always-available record that both parties can reference.
+**Value proposition:** A Discord bot that lives in DMs, allowing the admin to log completed chapters and automatically calculate accumulated balance (points and separate bonuses), while giving staff members self-service access to view their own stats and history. The bot provides an auditable, always-available record that both parties can reference.
 
 ## Scope & Success Metrics
 
 ### In-scope (Phase 1 & 2)
 - Users can self-register as staff dynamically via `/reg`, and admin can remove staff via `/staff_remove`
 - Admin can delete logs and reset balances via `/clear_logs`
-- Admin can log completed chapters via `/ch_done` command in DMs (single, range, comma-separated)
+- Admin can log completed chapters via `/point` command (single, range, comma-separated)
+- Admin can add bonuses via `/bonus` command (separate from chapter points)
 - Admin can deduct balance via `/deduct` command with mandatory reason
-- Automatic balance calculation: `balance += point + bonus` per command invocation
-- Staff can view their own stats via `/staff_stat` command in DMs
-- Bot responds with informative, clean embed messages showing chapter records and balance
-- Full balance history tracking (additions from chapters + deductions)
+- Admin can use **User Context Menu** (`Right-click → Apps → Log Points`) for automatic user targeting in DMs (opens a Modal)
+- Admin can view all active staff leaderboard via `/staff_list`
+- Automatic balance calculation: `balance += point` per `/point`; bonus added separately via `/bonus`
+- Staff can view their own stats via `/staff_stat` (ephemeral/private by default); admin has `public` toggle
+- Bot responds with informative, compact embed messages optimized for mobile
+- Full balance history tracking (additions from chapters, bonuses, and deductions)
 - Persistent data storage in Supabase PostgreSQL
 - Bot runs locally on admin's PC (no cloud hosting needed)
 
@@ -58,24 +61,31 @@ Scanlation teams lack a simple, centralized way to track which chapters have bee
                               |
                      [discord.js library]
                               |
-                     [Command Handler]
-                    /     |      |      |      |        \ 
-           /ch_done  /deduct  /staff_stat  /help  /reg        /clear_logs
-           (admin)   (admin)   (all)       (all)  (all)       (admin)
-                    \     |      |      |      |        / 
+                     [Command Handler + Modal Handler]
+                    /    |      |       |      |      |      \        \
+           /point  /bonus  /deduct  /staff_stat  /help  /reg  /clear_logs  /staff_list
+           (admin) (admin) (admin)   (all)       (all)  (all) (admin)      (admin)
+                              |
+                     [Context Menu: "Log Points" (admin) → Modal]
+                              |
                      [Supabase PostgreSQL]
                      (persistent cloud storage)
 ```
 
 **Pattern:** Simple layered architecture — Command Layer → Service Layer → Data Layer. Chosen for simplicity; the bot is a single long-running process with no need for microservices or event queues.
 
-**Data flow (admin logs chapter):**
-1. Admin sends `/ch_done user:@staff chapters:1-5 point:1.5 bonus:0.5` in DM to bot
+**Data flow (admin logs chapter via `/point`):**
+1. Admin sends `/point user:@staff chapters:1-5 point:1.5` in DM to bot
 2. Bot validates admin role, parses chapter input (range → [1,2,3,4,5])
 3. Bot inserts chapter records into Supabase `chapter_logs` table
-4. Bot calculates balance addition: `(1.5 + 0.5) = 2.0` per invocation
+4. Bot calculates balance addition: `1.5 × 5 chapters = 7.50`
 5. Bot updates user's `balance` in `staff` table
-6. Bot replies with embed: chapters logged, balance added, new total balance
+6. Bot replies with embed: chapters logged, point/ch, total added, new balance
+
+**Data flow (admin logs chapter via Context Menu):**
+1. Admin right-clicks staff profile in DM → Apps → "Log Points"
+2. Bot shows a Modal popup (chapters, point, note fields)
+3. Same processing as `/point` above, but target user is auto-detected
 
 **Data flow (staff checks stats):**
 1. Staff sends `/staff_stat` in DM to bot
@@ -111,7 +121,8 @@ Scanlation teams lack a simple, centralized way to track which chapters have bee
 - **Supabase free tier:** 500MB database, 2 projects max, 50K monthly active users
 - **Shared server required:** Admin, staff, and bot must share at least one Discord server for DM commands to work
 - **DM-only interaction:** All commands run in direct messages, not in servers
-- **No self-registration:** Users are added by admin via config or admin command
+- **Self-registration as staff only:** Users register via `/reg` (always staff role). Admin role promotion is done directly in Supabase database for security
+- **Master Admin:** The initial admin Discord ID is configured via `MASTER_ADMIN_ID` in `.env` (never hardcoded in source)
 
 ### Assumptions
 - Staff team is small (< 20 members) — free tier limits are sufficient
@@ -164,8 +175,8 @@ Enforcement details will live in AGENTS.md.
 | id | uuid (PK) | Auto-generated |
 | staff_id | uuid (FK → staff.id) | Whose balance changed |
 | amount | numeric(10,2) | Change amount (+positive or -negative) |
-| type | text | 'chapter' or 'deduct' |
-| reason | text | Required for deductions, optional for chapters |
+| type | text | 'chapter', 'deduct', or 'bonus' |
+| reason | text | Required for deductions/bonuses, optional for chapters |
 | reference_id | uuid (FK → chapter_logs.id) | Links to chapter_logs when type='chapter' |
 | logged_by | uuid (FK → staff.id) | Admin who made the change |
 | created_at | timestamptz | When this was logged |
@@ -188,10 +199,11 @@ Enforcement details will live in AGENTS.md.
 
 ## Roadmap / Milestones
 
-- [x] Phase 1 — Foundation: Project setup, Discord bot connection, Supabase schema, `/ch_done`, `/deduct`, `/staff_stat`, `/help` commands working in DM.
+- [x] Phase 1 — Foundation: Project setup, Discord bot connection, Supabase schema, `/point`, `/deduct`, `/staff_stat`, `/help` commands working in DM.
 - [x] Phase 2 — Polish: Dynamic staff management via self-registration (`/reg`), admin removal (`/staff_remove`), deleting past records (`/clear_logs`), User Apps integration (usable everywhere).
+- [x] Phase 2.5 — Refactor & Dashboard: Separated `/bonus` from `/point`, added Context Menu "Log Points" with Modal, added `/staff_list` leaderboard, mobile-optimized embeds, ephemeral visibility controls, all text in English.
 - [ ] Phase 3 — Multi-project: Add project/comic title support, per-project balance tracking, project-scoped stats. **Done when:** admin can assign chapters to specific comic titles.
-- [ ] Phase 4 — Advanced: Export data (CSV), monthly summaries, leaderboard. **Done when:** admin can export records and view summaries.
+- [ ] Phase 4 — Advanced: Export data (CSV), monthly summaries. **Done when:** admin can export records and view summaries.
 
 ## Risks, Mitigations & Technical Debt
 
@@ -204,7 +216,7 @@ Enforcement details will live in AGENTS.md.
 
 | Debt | Why it exists | Payoff plan |
 |---|---|---|
-| Hardcoded staff list | Simplicity for Phase 1 | Phase 2: admin command to manage staff |
+| `any` type used for command registry Map | Needed to support both ChatInput and ContextMenu commands | Refactor with union type or overloaded handler |
 | No multi-project support | Not needed yet, team works on one project | Phase 3: add project entity |
 
 ## Open Questions & Decision Changelog
@@ -219,3 +231,5 @@ Enforcement details will live in AGENTS.md.
 |---|---|---|
 | 2026-06-23 | Initial draft | Project kickoff |
 | 2026-06-23 | v0.3.0: Local hosting, /deduct command, balance_logs table | User feedback: Railway not permanent, need deduction tracking |
+| 2026-06-24 | v0.5.0: Refactored /ch_done→/point, separated /bonus, added Context Menu "Log Points", /staff_list dashboard, mobile-optimized embeds, English-only text, ephemeral visibility for staff_stat | Command UX improvements and admin dashboard |
+| 2026-06-24 | v0.5.1: Moved MASTER_ADMIN_ID to .env, added admin check on modal submit, fixed bonus label in balance history | REVIEW.md audit fixes |

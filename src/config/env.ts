@@ -5,6 +5,7 @@ interface EnvConfig {
   DISCORD_CLIENT_ID: string;
   SUPABASE_URL: string;
   SUPABASE_ANON_KEY: string;
+  MASTER_ADMIN_ID: string;
 }
 
 function getEnvVar(name: string): string {
@@ -23,4 +24,5 @@ export const env: EnvConfig = {
   DISCORD_CLIENT_ID: getEnvVar('DISCORD_CLIENT_ID'),
   SUPABASE_URL: getEnvVar('SUPABASE_URL'),
   SUPABASE_ANON_KEY: getEnvVar('SUPABASE_ANON_KEY'),
+  MASTER_ADMIN_ID: getEnvVar('MASTER_ADMIN_ID'),
 };

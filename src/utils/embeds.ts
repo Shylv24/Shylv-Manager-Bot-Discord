@@ -133,7 +133,9 @@ export function createStaffStatEmbed(stats: StaffStats): EmbedBuilder {
     const balanceLines = recentBalanceLogs.slice(0, 5).map((log: BalanceLog) => {
       const amount = Number(log.amount);
       const sign = amount >= 0 ? '+' : '';
-      const label = log.type === 'chapter' ? 'chapter log' : log.reason || 'deduction';
+      const label = log.type === 'chapter' ? 'chapter log'
+        : log.type === 'bonus' ? (log.reason || 'bonus')
+        : (log.reason || 'deduction');
       const date = formatDate(log.created_at);
       return `• \`${sign}${formatBalance(amount)}\` (${label}) — ${date}`;
     });
@@ -143,6 +145,37 @@ export function createStaffStatEmbed(stats: StaffStats): EmbedBuilder {
       inline: false,
     });
   }
+
+  return embed;
+}
+
+// ─── Staff List Embed (Dashboard) ───
+
+export function createStaffListEmbed(staffList: import('../types/index.js').Staff[]): EmbedBuilder {
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.INFO)
+    .setTitle('🏆 Staff Leaderboard & Dashboard')
+    .setDescription('Overview of all active staff members and their current balances.')
+    .setTimestamp()
+    .setFooter({ text: 'Shylv Manager Bot' });
+
+  if (staffList.length === 0) {
+    embed.addFields({ name: 'No Active Staff', value: 'There are currently no active staff members.' });
+    return embed;
+  }
+
+  // Format into chunks if there are many staff, but let's keep it simple first
+  const lines = staffList.map((staff, index) => {
+    const roleEmoji = staff.role === 'admin' ? '🛡️' : '👤';
+    const balance = formatBalance(Number(staff.balance));
+    return `**${index + 1}.** <@${staff.discord_id}> ${roleEmoji} — 💳 \`${balance}\``;
+  });
+
+  embed.addFields({
+    name: 'Active Staff',
+    value: lines.join('\n'),
+    inline: false,
+  });
 
   return embed;
 }

@@ -20,6 +20,7 @@ import { data as regCommand } from './reg.js';
 import { data as staffRemoveCommand } from './staff_remove.js';
 import { data as clearLogsCommand } from './clear_logs.js';
 import { data as contextLogCommand } from './context_log.js';
+import { data as staffListCommand } from './staff_list.js';
 
 const commands = [
   pointCommand.toJSON(),
@@ -31,6 +32,7 @@ const commands = [
   staffRemoveCommand.toJSON(),
   clearLogsCommand.toJSON(),
   contextLogCommand.toJSON(),
+  staffListCommand.toJSON(),
 ];
 
 async function registerCommands() {

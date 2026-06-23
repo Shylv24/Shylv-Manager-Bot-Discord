@@ -28,6 +28,7 @@ import * as regCommand from './commands/reg.js';
 import * as staffRemoveCommand from './commands/staff_remove.js';
 import * as clearLogsCommand from './commands/clear_logs.js';
 import * as contextLogCommand from './commands/context_log.js';
+import * as staffListCommand from './commands/staff_list.js';
 
 // ─── Command Registry ───
 const commands = new Map<string, any>();
@@ -41,6 +42,7 @@ commands.set('reg', regCommand);
 commands.set('staff_remove', staffRemoveCommand);
 commands.set('clear_logs', clearLogsCommand);
 commands.set('Log Points', contextLogCommand);
+commands.set('staff_list', staffListCommand);
 
 // ─── Discord Client ───
 const client = new Client({
@@ -114,6 +116,13 @@ client.on('interactionCreate', async (interaction: Interaction) => {
     }
   } else if (interaction.isModalSubmit()) {
     if (interaction.customId.startsWith('log_points_modal_')) {
+      // Verify admin permission (the context menu checks too, but this prevents crafted submissions)
+      const { isAdmin } = await import('./utils/staff_cache.js');
+      if (!isAdmin(interaction.user.id)) {
+        await interaction.reply({ content: 'You do not have permission to do this.', ephemeral: true });
+        return;
+      }
+
       const targetUserId = interaction.customId.replace('log_points_modal_', '');
       const chaptersInput = interaction.fields.getTextInputValue('chaptersInput');
       const pointInput = interaction.fields.getTextInputValue('pointInput');

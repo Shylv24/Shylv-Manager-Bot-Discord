@@ -22,6 +22,22 @@ export async function findStaffByDiscordId(discordId: string): Promise<Staff | n
   return data as Staff | null;
 }
 
+/** Get all active staff members, ordered by balance descending */
+export async function getAllActiveStaff(): Promise<Staff[]> {
+  const { data, error } = await getSupabase()
+    .from('staff')
+    .select('*')
+    .eq('is_active', true)
+    .order('balance', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching all active staff:', error);
+    throw new Error('Database error while fetching staff list.');
+  }
+
+  return (data || []) as Staff[];
+}
+
 /**
  * Add or reactivate a staff member.
  * Called by /reg command.

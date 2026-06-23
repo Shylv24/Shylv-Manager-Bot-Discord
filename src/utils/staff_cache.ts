@@ -5,12 +5,13 @@
 //
 
 import { getSupabase } from '../database/supabase.js';
+import { env } from '../config/env.js';
 import type { StaffConfig } from '../types/index.js';
 
-// In-memory cache: Discord ID// The in-memory cache
+// In-memory cache
 const staffCache = new Map<string, StaffConfig>();
 
-export const MASTER_ADMIN_ID = '587958693908185108';
+export const MASTER_ADMIN_ID = env.MASTER_ADMIN_ID;
 
 /**
  * Load active staff from Supabase into memory on boot.

@@ -24,6 +24,12 @@ export const data = new SlashCommandBuilder()
       .setDescription('(Admin only) View stats of another staff member')
       .setRequired(false)
   )
+  .addBooleanOption((option) =>
+    option
+      .setName('public')
+      .setDescription('(Admin only) Show the stats publicly in the channel? (Default: False)')
+      .setRequired(false)
+  )
   .setDMPermission(true)
   .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
   .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel);
@@ -31,6 +37,7 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const callerIsAdmin = isAdmin(interaction.user.id);
   const targetUser = interaction.options.getUser('user');
+  const isPublic = interaction.options.getBoolean('public') ?? false;
 
   // Determine whose stats to show
   let targetDiscordId: string;
@@ -75,8 +82,11 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     targetDiscordId = interaction.user.id;
   }
 
+  // Force ephemeral (private) for normal staff. Admins can choose to make it public.
+  const isEphemeral = callerIsAdmin ? !isPublic : true;
+
   // Defer reply
-  await interaction.deferReply();
+  await interaction.deferReply({ ephemeral: isEphemeral });
 
   try {
     const stats = await getStaffStats(targetDiscordId);
