@@ -1,7 +1,7 @@
-// ─── /deduct Command ─── Shylv Manager Bot ───
+// ─── /bonus Command ─── Shylv Manager Bot ───
 //
-// Admin-only command to deduct balance from a staff member.
-// Usage: /deduct user:@Staff amount:5.00 reason:Pembayaran Juni
+// Admin-only command to add a bonus balance to a staff member.
+// Usage: /bonus user:@Staff amount:5.00 reason:Good work
 //
 
 import {
@@ -11,29 +11,29 @@ import {
   InteractionContextType,
 } from 'discord.js';
 import { isAdmin, isRegistered } from '../utils/staff_cache.js';
-import { addDeduction } from '../database/queries.js';
-import { createDeductEmbed, createErrorEmbed } from '../utils/embeds.js';
+import { addBonusLog } from '../database/queries.js';
+import { createBonusEmbed, createErrorEmbed } from '../utils/embeds.js';
 
 export const data = new SlashCommandBuilder()
-  .setName('deduct')
-  .setDescription('Deduct balance from a staff member')
+  .setName('bonus')
+  .setDescription('Add a bonus to a staff member')
   .addUserOption((option) =>
     option
       .setName('user')
-      .setDescription('The staff member to deduct from')
+      .setDescription('The staff member to give the bonus to')
       .setRequired(true)
   )
   .addNumberOption((option) =>
     option
       .setName('amount')
-      .setDescription('Amount to deduct (e.g. 5.00)')
+      .setDescription('Amount to add (e.g., 5.00)')
       .setRequired(true)
       .setMinValue(0.01)
   )
   .addStringOption((option) =>
     option
       .setName('reason')
-      .setDescription('Reason for the deduction (e.g., "Payment for June")')
+      .setDescription('Reason for the bonus (e.g., "Good work")')
       .setRequired(true)
   )
   .setDMPermission(true)
@@ -44,7 +44,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   // 1. Check admin permission
   if (!isAdmin(interaction.user.id)) {
     await interaction.reply({
-      embeds: [createErrorEmbed('You do not have permission to use this command. Admin only.')],
+      embeds: [createErrorEmbed('You do not have administrative privileges to use this command.')],
       ephemeral: true,
     });
     return;
@@ -58,7 +58,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   // 3. Validate target user
   if (targetUser.bot) {
     await interaction.reply({
-      embeds: [createErrorEmbed('Cannot deduct balance from a bot.')],
+      embeds: [createErrorEmbed('Cannot add bonus to bot accounts.')],
       ephemeral: true,
     });
     return;
@@ -76,30 +76,30 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   await interaction.deferReply();
 
   try {
-    // 5. Process deduction
-    const updatedStaff = await addDeduction({
+    // 5. Process bonus
+    const updatedStaff = await addBonusLog({
       staffDiscordId: targetUser.id,
       amount,
       reason,
       loggedByDiscordId: interaction.user.id,
     });
 
-    // 6. Reply with deduction embed
+    // 6. Reply with bonus embed
     await interaction.editReply({
       embeds: [
-        createDeductEmbed({
+        createBonusEmbed({
           staffUsername: updatedStaff.discord_username,
           staffDiscordId: targetUser.id,
           amount,
           reason,
-          remainingBalance: Number(updatedStaff.balance),
+          newBalance: Number(updatedStaff.balance),
         }),
       ],
     });
   } catch (error) {
-    console.error('Error in /deduct:', error);
+    console.error('Error in /bonus:', error);
     await interaction.editReply({
-      embeds: [createErrorEmbed('An error occurred while processing the deduction. Please try again.')],
+      embeds: [createErrorEmbed('An internal error occurred while processing the bonus.')],
     });
   }
 }

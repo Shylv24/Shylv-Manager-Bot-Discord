@@ -32,19 +32,15 @@ function formatBalance(amount: number): string {
 
 // ─── Chapter Log Embed ───
 
-/** Embed for successful /ch_done command */
 export function createChapterLogEmbed(data: ChapterLogEmbedData): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setColor(COLORS.SUCCESS)
     .setTitle('✅ Chapter Logged Successfully')
-    .addFields(
-      { name: '👤 Staff', value: `<@${data.staffDiscordId}>`, inline: true },
-      { name: '📖 Chapters', value: formatChapters(data.chapters), inline: true },
-      { name: '\u200b', value: '\u200b', inline: true }, // spacer
-      { name: '💎 Point', value: formatBalance(data.point), inline: true },
-      { name: '🎁 Bonus', value: formatBalance(data.bonus), inline: true },
-      { name: '💰 Added', value: `+${formatBalance(data.totalAdded)}`, inline: true },
-      { name: '💳 New Balance', value: `**${formatBalance(data.newBalance)}**`, inline: false },
+    .setDescription(
+      `👤 **Staff:** <@${data.staffDiscordId}>\n` +
+      `📖 **Chapters:** ${formatChapters(data.chapters)}\n` +
+      `💎 **Point/Ch:** \`${formatBalance(data.point)}\` | 💰 **Total Added:** \`+${formatBalance(data.totalAdded)}\`\n` +
+      `💳 **New Balance:** \`${formatBalance(data.newBalance)}\``
     )
     .setTimestamp()
     .setFooter({ text: 'Shylv Manager Bot' });
@@ -56,6 +52,23 @@ export function createChapterLogEmbed(data: ChapterLogEmbedData): EmbedBuilder {
   return embed;
 }
 
+// ─── Bonus Embed ───
+
+export function createBonusEmbed(data: import('../types/index.js').BonusEmbedData): EmbedBuilder {
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.SUCCESS) // Bonus is positive, so SUCCESS color
+    .setTitle('🎁 Bonus Added')
+    .setDescription(
+      `👤 **Staff:** <@${data.staffDiscordId}>\n` +
+      `💰 **Bonus:** \`+${formatBalance(data.amount)}\` | 💳 **New Balance:** \`${formatBalance(data.newBalance)}\`\n` +
+      `📝 **Reason:** ${data.reason}`
+    )
+    .setTimestamp()
+    .setFooter({ text: 'Shylv Manager Bot' });
+
+  return embed;
+}
+
 // ─── Deduction Embed ───
 
 /** Embed for successful /deduct command */
@@ -63,12 +76,10 @@ export function createDeductEmbed(data: DeductEmbedData): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setColor(COLORS.DEDUCT)
     .setTitle('💸 Balance Deducted')
-    .addFields(
-      { name: '👤 Staff', value: `<@${data.staffDiscordId}>`, inline: true },
-      { name: '💰 Deducted', value: `-${formatBalance(data.amount)}`, inline: true },
-      { name: '\u200b', value: '\u200b', inline: true }, // spacer
-      { name: '📝 Reason', value: data.reason, inline: false },
-      { name: '💳 Remaining Balance', value: `**${formatBalance(data.remainingBalance)}**`, inline: false },
+    .setDescription(
+      `👤 **Staff:** <@${data.staffDiscordId}>\n` +
+      `💰 **Deducted:** \`-${formatBalance(data.amount)}\` | 💳 **Remaining:** \`${formatBalance(data.remainingBalance)}\`\n` +
+      `📝 **Reason:** ${data.reason}`
     )
     .setTimestamp()
     .setFooter({ text: 'Shylv Manager Bot' });
@@ -94,13 +105,10 @@ export function createStaffStatEmbed(stats: StaffStats): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setColor(COLORS.INFO)
     .setTitle('📊 Staff Statistics')
-    .addFields(
-      { name: '👤 Name', value: `<@${staff.discord_id}> (${staff.discord_username})`, inline: true },
-      { name: '🏷️ Role', value: staff.role.charAt(0).toUpperCase() + staff.role.slice(1), inline: true },
-      { name: '\u200b', value: '\u200b', inline: true },
-      { name: '💳 Balance', value: `**${formatBalance(Number(staff.balance))}**`, inline: true },
-      { name: '📖 Total Chapters', value: `${totalChapters} chapters (${totalChapterLogs} entries)`, inline: true },
-      { name: '🕐 Last Active', value: lastActive ? formatDate(lastActive) : 'No activity yet', inline: true },
+    .setDescription(
+      `👤 **User:** <@${staff.discord_id}> (\`${staff.discord_username}\`) | 🏷️ **Role:** \`${staff.role.toUpperCase()}\`\n` +
+      `💳 **Balance:** **\`${formatBalance(Number(staff.balance))}\`**\n` +
+      `📖 **Chapters:** \`${totalChapters}\` (\`${totalChapterLogs}\` logs) | 🕐 **Active:** ${lastActive ? formatDate(lastActive) : '*No activity*'}`
     )
     .setTimestamp()
     .setFooter({ text: 'Shylv Manager Bot' });
@@ -111,10 +119,10 @@ export function createStaffStatEmbed(stats: StaffStats): EmbedBuilder {
       const chapters = formatChapters(log.chapters);
       const total = formatBalance(Number(log.total_added));
       const date = formatDate(log.created_at);
-      return `• Ch ${chapters} → +${total} — ${date}`;
+      return `• Ch **${chapters}** → \`+${total}\` — ${date}`;
     });
     embed.addFields({
-      name: '📋 Recent Chapters',
+      name: '📋 Recent Completed Chapters',
       value: chapterLines.join('\n'),
       inline: false,
     });
@@ -125,9 +133,9 @@ export function createStaffStatEmbed(stats: StaffStats): EmbedBuilder {
     const balanceLines = recentBalanceLogs.slice(0, 5).map((log: BalanceLog) => {
       const amount = Number(log.amount);
       const sign = amount >= 0 ? '+' : '';
-      const label = log.type === 'chapter' ? 'chapter' : log.reason || 'deduction';
+      const label = log.type === 'chapter' ? 'chapter log' : log.reason || 'deduction';
       const date = formatDate(log.created_at);
-      return `• ${sign}${formatBalance(amount)} (${label}) — ${date}`;
+      return `• \`${sign}${formatBalance(amount)}\` (${label}) — ${date}`;
     });
     embed.addFields({
       name: '💰 Recent Balance History',
@@ -158,16 +166,21 @@ export function createHelpEmbed(isAdmin: boolean): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setColor(COLORS.HELP)
     .setTitle('📋 Shylv Manager Bot — Commands')
-    .setDescription('Bot untuk manajemen scanlation — track chapters & balance.')
+    .setDescription('Discord bot for scanlation team management — track chapters & balance.')
     .addFields(
       {
+        name: '✍️ `/reg`',
+        value: 'Register yourself as a staff member.',
+        inline: false,
+      },
+      {
         name: '📖 `/staff_stat`',
-        value: 'Lihat statistik dan riwayat balance kamu.\nAdmin bisa tambahkan `user:@staff` untuk lihat stats orang lain.',
+        value: 'View your statistics and balance history.\nAdmins can specify `user:@staff` to view others\' statistics.',
         inline: false,
       },
       {
         name: '❓ `/help`',
-        value: 'Menampilkan daftar commands ini.',
+        value: 'Show this commands list.',
         inline: false,
       },
     )
@@ -182,42 +195,30 @@ export function createHelpEmbed(isAdmin: boolean): EmbedBuilder {
         inline: false,
       },
       {
-        name: '✅ `/ch_done`',
-        value: [
-          'Log chapter yang sudah dikerjakan staff.',
-          '`user` — Pilih staff member',
-          '`chapters` — Nomor chapter: `13`, `1-5`, `1,3,6`, `1-3,6,8-10`',
-          '`point` — Point value (contoh: `1.5`)',
-          '`bonus` — Bonus value (contoh: `0.5`)',
-          '`note` — Catatan (opsional)',
-        ].join('\n'),
+        name: '✅ `/point`',
+        value: 'Log completed chapters.\n`user` (Staff), `chapters` (e.g. 1-5), `point` (Value per chapter), `note` (Optional)',
+        inline: false,
+      },
+      {
+        name: '🎁 `/bonus`',
+        value: 'Add a bonus to a staff member.\n`user` (Staff), `amount` (Value), `reason` (Required)',
         inline: false,
       },
       {
         name: '💸 `/deduct`',
-        value: [
-          'Kurangi balance staff.',
-          '`user` — Pilih staff member',
-          '`amount` — Jumlah dikurangi',
-          '`reason` — Alasan (wajib)',
-        ].join('\n'),
-        inline: false,
-      },
-      {
-        name: '➕ `/staff_add`',
-        value: 'Daftarkan user Discord baru ke dalam sistem sebagai staff atau admin.',
+        value: 'Deduct balance.\n`user` (Staff), `amount` (Value), `reason` (Required)',
         inline: false,
       },
       {
         name: '➖ `/staff_remove`',
-        value: 'Cabut akses staff dari sistem.',
+        value: 'Deactivate a staff member.',
         inline: false,
       },
       {
         name: '🧹 `/clear_logs`',
-        value: 'Hapus riwayat chapter/balance logs milik staff tertentu dan (opsional) reset saldo mereka.',
+        value: 'Wipe chapter/balance logs for a user.',
         inline: false,
-      },
+      }
     );
   }
 

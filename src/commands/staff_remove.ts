@@ -10,7 +10,7 @@ import {
   ApplicationIntegrationType,
   InteractionContextType,
 } from 'discord.js';
-import { isAdmin, isRegistered, removeStaffCache } from '../utils/staff_cache.js';
+import { isAdmin, isRegistered, removeStaffCache, MASTER_ADMIN_ID } from '../utils/staff_cache.js';
 import { deactivateStaff } from '../database/queries.js';
 import { createErrorEmbed, createSuccessEmbed } from '../utils/embeds.js';
 
@@ -44,6 +44,15 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   if (targetUser.id === interaction.user.id) {
     await interaction.reply({
       embeds: [createErrorEmbed('You cannot remove yourself.')],
+      ephemeral: true,
+    });
+    return;
+  }
+
+  // 2.5 Prevent removing Master Admin
+  if (targetUser.id === MASTER_ADMIN_ID) {
+    await interaction.reply({
+      embeds: [createErrorEmbed('The Master Admin cannot be removed from the system.')],
       ephemeral: true,
     });
     return;

@@ -19,28 +19,28 @@ import {
 import { env } from './config/env.js';
 import { loadStaffCache } from './utils/staff_cache.js';
 
-// Import command handlers
-import * as chDoneCommand from './commands/ch_done.js';
+import * as pointCommand from './commands/point.js';
+import * as bonusCommand from './commands/bonus.js';
 import * as deductCommand from './commands/deduct.js';
 import * as staffStatCommand from './commands/staff_stat.js';
 import * as helpCommand from './commands/help.js';
-import * as staffAddCommand from './commands/staff_add.js';
+import * as regCommand from './commands/reg.js';
 import * as staffRemoveCommand from './commands/staff_remove.js';
 import * as clearLogsCommand from './commands/clear_logs.js';
+import * as contextLogCommand from './commands/context_log.js';
 
 // ─── Command Registry ───
-const commands = new Map<string, {
-  data: { name: string };
-  execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
-}>();
+const commands = new Map<string, any>();
 
-commands.set('ch_done', chDoneCommand);
+commands.set('point', pointCommand);
+commands.set('bonus', bonusCommand);
 commands.set('deduct', deductCommand);
 commands.set('staff_stat', staffStatCommand);
 commands.set('help', helpCommand);
-commands.set('staff_add', staffAddCommand);
+commands.set('reg', regCommand);
 commands.set('staff_remove', staffRemoveCommand);
 commands.set('clear_logs', clearLogsCommand);
+commands.set('Log Points', contextLogCommand);
 
 // ─── Discord Client ───
 const client = new Client({
@@ -81,39 +81,93 @@ client.once('ready', async (readyClient) => {
   console.log('');
 });
 
-// ─── Event: Interaction (Slash Commands) ───
+// ─── Event: Interaction ───
 client.on('interactionCreate', async (interaction: Interaction) => {
-  // Only handle slash commands
-  if (!interaction.isChatInputCommand()) return;
+  if (interaction.isChatInputCommand() || interaction.isUserContextMenuCommand()) {
+    const command = commands.get(interaction.commandName);
 
-  const command = commands.get(interaction.commandName);
+    if (!command) {
+      console.warn(`⚠️ Unknown command: /${interaction.commandName}`);
+      return;
+    }
 
-  if (!command) {
-    console.warn(`⚠️ Unknown command: /${interaction.commandName}`);
-    return;
-  }
+    const isDM = !interaction.guild;
+    const location = isDM ? 'DM' : `Server: ${interaction.guild?.name}`;
+    console.log(`📨 /${interaction.commandName} — by ${interaction.user.tag} (${location})`);
 
-  // Log command usage
-  const isDM = !interaction.guild;
-  const location = isDM ? 'DM' : `Server: ${interaction.guild?.name}`;
-  console.log(`📨 /${interaction.commandName} — by ${interaction.user.tag} (${location})`);
-
-  try {
-    await command.execute(interaction);
-  } catch (error) {
-    console.error(`❌ Error executing /${interaction.commandName}:`, error);
-
-    // Try to reply with error if we haven't already
-    const errorMessage = 'An unexpected error occurred. Please try again.';
     try {
-      if (interaction.deferred || interaction.replied) {
-        await interaction.editReply({ content: errorMessage });
-      } else {
-        await interaction.reply({ content: errorMessage, ephemeral: true });
+      await command.execute(interaction);
+    } catch (error) {
+      console.error(`❌ Error executing /${interaction.commandName}:`, error);
+      const errorMessage = 'An unexpected error occurred. Please try again.';
+      try {
+        if (interaction.isRepliable()) {
+          if (interaction.deferred || interaction.replied) {
+            await interaction.editReply({ content: errorMessage });
+          } else {
+            await interaction.reply({ content: errorMessage, ephemeral: true });
+          }
+        }
+      } catch (e) {
+        console.error('   Could not send error response to user.');
       }
-    } catch {
-      // Can't respond to the interaction, just log it
-      console.error('   Could not send error response to user.');
+    }
+  } else if (interaction.isModalSubmit()) {
+    if (interaction.customId.startsWith('log_points_modal_')) {
+      const targetUserId = interaction.customId.replace('log_points_modal_', '');
+      const chaptersInput = interaction.fields.getTextInputValue('chaptersInput');
+      const pointInput = interaction.fields.getTextInputValue('pointInput');
+      const noteInput = interaction.fields.getTextInputValue('noteInput') || null;
+
+      const point = parseFloat(pointInput);
+
+      if (isNaN(point) || point < 0) {
+        await interaction.reply({ content: 'Invalid point value.', ephemeral: true });
+        return;
+      }
+
+      // We handle the rest using the logic from point command
+      const { parseChapters } = await import('./utils/parser.js');
+      const { addChapterLog } = await import('./database/queries.js');
+      const { createChapterLogEmbed, createErrorEmbed } = await import('./utils/embeds.js');
+
+      const parseResult = parseChapters(chaptersInput);
+      if (!parseResult.success) {
+        await interaction.reply({ embeds: [createErrorEmbed(`Invalid chapter format: ${parseResult.error}`)], ephemeral: true });
+        return;
+      }
+
+      await interaction.deferReply();
+
+      try {
+        const numChapters = parseResult.chapters.length;
+        const totalPoint = point * numChapters;
+
+        const result = await addChapterLog({
+          staffDiscordId: targetUserId,
+          chapters: parseResult.chapters,
+          point: totalPoint,
+          note: noteInput,
+          loggedByDiscordId: interaction.user.id,
+        });
+
+        await interaction.editReply({
+          embeds: [
+            createChapterLogEmbed({
+              staffUsername: result.staff.discord_username,
+              staffDiscordId: targetUserId,
+              chapters: parseResult.chapters,
+              point: point, // Fix: show point per chapter
+              totalAdded: totalPoint,
+              newBalance: Number(result.staff.balance),
+              note: noteInput,
+            }),
+          ],
+        });
+      } catch (error) {
+        console.error('Error in ModalSubmit:', error);
+        await interaction.editReply({ embeds: [createErrorEmbed('An internal error occurred.')] });
+      }
     }
   }
 });

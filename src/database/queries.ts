@@ -24,7 +24,7 @@ export async function findStaffByDiscordId(discordId: string): Promise<Staff | n
 
 /**
  * Add or reactivate a staff member.
- * Called by /staff_add command.
+ * Called by /reg command.
  */
 export async function addStaff(discordId: string, username: string, role: 'admin' | 'staff'): Promise<Staff> {
   const supabase = getSupabase();
@@ -75,7 +75,6 @@ interface AddChapterLogParams {
   staffDiscordId: string;
   chapters: number[];
   point: number;
-  bonus: number;
   note: string | null;
   loggedByDiscordId: string;
 }
@@ -89,7 +88,7 @@ export async function addChapterLog(params: AddChapterLogParams): Promise<{
   chapterLog: ChapterLog;
 }> {
   const supabase = getSupabase();
-  const totalAdded = params.point + params.bonus;
+  const totalAdded = params.point;
 
   // Get staff and admin records
   const staff = await findStaffByDiscordId(params.staffDiscordId);
@@ -105,7 +104,7 @@ export async function addChapterLog(params: AddChapterLogParams): Promise<{
       staff_id: staff.id,
       chapters: params.chapters,
       point: params.point,
-      bonus: params.bonus,
+      bonus: 0, // Bonus is now handled by a separate command
       total_added: totalAdded,
       note: params.note,
       logged_by: admin.id,
@@ -153,6 +152,60 @@ export async function addChapterLog(params: AddChapterLogParams): Promise<{
     staff: updatedStaff as Staff,
     chapterLog: chapterLog as ChapterLog,
   };
+}
+
+interface AddBonusParams {
+  staffDiscordId: string;
+  amount: number;
+  reason: string;
+  loggedByDiscordId: string;
+}
+
+/**
+ * Add a bonus to a staff member.
+ * Returns the updated staff record.
+ */
+export async function addBonusLog(params: AddBonusParams): Promise<Staff> {
+  const supabase = getSupabase();
+
+  const staff = await findStaffByDiscordId(params.staffDiscordId);
+  if (!staff) throw new Error('Staff member not found in database.');
+
+  const admin = await findStaffByDiscordId(params.loggedByDiscordId);
+  if (!admin) throw new Error('Admin not found in database.');
+
+  // 1. Insert balance log (positive amount)
+  const { error: balanceLogError } = await supabase
+    .from('balance_logs')
+    .insert({
+      staff_id: staff.id,
+      amount: params.amount,
+      type: 'bonus',
+      reason: params.reason,
+      reference_id: null,
+      logged_by: admin.id,
+    });
+
+  if (balanceLogError) {
+    console.error('Error inserting bonus log:', balanceLogError);
+    throw new Error('Failed to log bonus.');
+  }
+
+  // 2. Update staff balance
+  const newBalance = Number(staff.balance) + params.amount;
+  const { data: updatedStaff, error: updateError } = await supabase
+    .from('staff')
+    .update({ balance: newBalance })
+    .eq('id', staff.id)
+    .select()
+    .single();
+
+  if (updateError || !updatedStaff) {
+    console.error('Error updating balance:', updateError);
+    throw new Error('Failed to update staff balance.');
+  }
+
+  return updatedStaff as Staff;
 }
 
 // ─── Deduction Queries ───

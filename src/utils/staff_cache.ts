@@ -7,11 +7,13 @@
 import { getSupabase } from '../database/supabase.js';
 import type { StaffConfig } from '../types/index.js';
 
-// In-memory cache: Discord ID -> StaffConfig
+// In-memory cache: Discord ID// The in-memory cache
 const staffCache = new Map<string, StaffConfig>();
 
+export const MASTER_ADMIN_ID = '587958693908185108';
+
 /**
- * Download all active staff from the database into memory.
+ * Load active staff from Supabase into memory on boot.
  * Call this once during bot startup.
  */
 export async function loadStaffCache(): Promise<void> {
@@ -38,13 +40,12 @@ export async function loadStaffCache(): Promise<void> {
 
   // --- BOOTSTRAP INITIAL ADMIN ---
   // If the admin is not in the database yet, we insert them automatically.
-  const BOOTSTRAP_ADMIN_ID = '587958693908185108';
-  if (!staffCache.has(BOOTSTRAP_ADMIN_ID)) {
+  if (!staffCache.has(MASTER_ADMIN_ID)) {
     console.log('⚠️ Initial admin not found in DB. Bootstrapping...');
     const { data: newAdmin, error: insertError } = await getSupabase()
       .from('staff')
       .upsert({
-        discord_id: BOOTSTRAP_ADMIN_ID,
+        discord_id: MASTER_ADMIN_ID,
         discord_username: 'shylv24',
         role: 'admin',
         is_active: true
@@ -53,9 +54,9 @@ export async function loadStaffCache(): Promise<void> {
       .single();
 
     if (!insertError && newAdmin) {
-      staffCache.set(BOOTSTRAP_ADMIN_ID, {
-        discordId: newAdmin.discord_id,
-        username: newAdmin.discord_username,
+      staffCache.set(MASTER_ADMIN_ID, {
+        discordId: MASTER_ADMIN_ID,
+        username: 'shylv24',
         role: 'admin',
       });
       console.log('✅ Initial admin bootstrapped successfully!');

@@ -1,6 +1,6 @@
 ---
 status: active
-version: 0.3.0
+version: 0.4.0
 last_updated: 2026-06-23
 owners: [Agung Prasetyo (solo-dev / admin)]
 related: [README.md, AGENTS.md, TASK.md]
@@ -8,7 +8,7 @@ related: [README.md, AGENTS.md, TASK.md]
 
 # PLANNING.md — Shylv Manager Bot Discord
 
-> A Discord DM-based bot for scanlation team management: tracking completed chapters and managing staff balance/payment records. Status: Phase 1 (Foundation). Read this first.
+> A Discord DM-based bot for scanlation team management: tracking completed chapters and managing staff balance/payment records. Status: Phase 2 (Dynamic Management). Read this first.
 > Human docs: README.md • Agent rules: AGENTS.md • Tasks: TASK.md
 
 ## Vision & Problem
@@ -21,8 +21,9 @@ Scanlation teams lack a simple, centralized way to track which chapters have bee
 
 ## Scope & Success Metrics
 
-### In-scope (Phase 1)
-- Admin can register/manage staff users via hardcoded config (username/ID)
+### In-scope (Phase 1 & 2)
+- Users can self-register as staff dynamically via `/reg`, and admin can remove staff via `/staff_remove`
+- Admin can delete logs and reset balances via `/clear_logs`
 - Admin can log completed chapters via `/ch_done` command in DMs (single, range, comma-separated)
 - Admin can deduct balance via `/deduct` command with mandatory reason
 - Automatic balance calculation: `balance += point + bonus` per command invocation
@@ -33,11 +34,11 @@ Scanlation teams lack a simple, centralized way to track which chapters have bee
 - Bot runs locally on admin's PC (no cloud hosting needed)
 
 ### Non-goals (explicitly NOT doing)
-- Server-based commands (all interactions are DM-only for now)
+- Server-based commands (all interactions are DM-only or User App contexts)
 - Multi-project/multi-comic support (structure will be prepared but not exposed)
 - Web dashboard or UI
 - Payment gateway integration
-- Self-registration by users (admin manages user list)
+- Self-registration of admin roles (admin role must be assigned directly in database)
 - Role-based access beyond admin/staff
 - Notification/reminder system
 
@@ -58,10 +59,10 @@ Scanlation teams lack a simple, centralized way to track which chapters have bee
                      [discord.js library]
                               |
                      [Command Handler]
-                    /     |      \      \
-           /ch_done  /deduct  /staff_stat  /help
-          (admin)   (admin)   (all)        (all)
-                    \     |      /      /
+                    /     |      |      |      |        \ 
+           /ch_done  /deduct  /staff_stat  /help  /reg        /clear_logs
+           (admin)   (admin)   (all)       (all)  (all)       (admin)
+                    \     |      |      |      |        / 
                      [Supabase PostgreSQL]
                      (persistent cloud storage)
 ```
@@ -139,6 +140,7 @@ Enforcement details will live in AGENTS.md.
 | discord_id | text (unique) | Discord user ID |
 | discord_username | text | Display name for logging |
 | role | text | 'admin' or 'staff' |
+| is_active | boolean | True if currently active staff, False if removed |
 | balance | numeric(10,2) | Accumulated balance (point + bonus) |
 | created_at | timestamptz | Registration date |
 | updated_at | timestamptz | Last modification |
@@ -186,8 +188,8 @@ Enforcement details will live in AGENTS.md.
 
 ## Roadmap / Milestones
 
-- [x] Phase 1 — Foundation: Project setup, Discord bot connection, Supabase schema, `/ch_done`, `/deduct`, `/staff_stat`, `/help` commands working in DM. **Done when:** admin can log chapters and deduct balance, staff can view stats, data persists.
-- [ ] Phase 2 — Polish: Admin command to add/remove staff dynamically, edit/delete past records, better edge case handling. **Done when:** admin can manage staff via commands.
+- [x] Phase 1 — Foundation: Project setup, Discord bot connection, Supabase schema, `/ch_done`, `/deduct`, `/staff_stat`, `/help` commands working in DM.
+- [x] Phase 2 — Polish: Dynamic staff management via self-registration (`/reg`), admin removal (`/staff_remove`), deleting past records (`/clear_logs`), User Apps integration (usable everywhere).
 - [ ] Phase 3 — Multi-project: Add project/comic title support, per-project balance tracking, project-scoped stats. **Done when:** admin can assign chapters to specific comic titles.
 - [ ] Phase 4 — Advanced: Export data (CSV), monthly summaries, leaderboard. **Done when:** admin can export records and view summaries.
 

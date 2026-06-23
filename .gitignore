@@ -1,19 +1,25 @@
 # Dependencies
 node_modules/
 
-# Environment
+# Environment variables
 .env
+.env*.local
 
-# Build output
+# Build & runtime logs
 dist/
+*.log
+.bun/
 
-# Bun
-bun.lockb
-
-# OS
+# OS files
 .DS_Store
 Thumbs.db
+Desktop.ini
 
-# IDE
+# IDE & Editor files
 .vscode/
 .idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

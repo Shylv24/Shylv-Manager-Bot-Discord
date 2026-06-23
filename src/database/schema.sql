@@ -36,8 +36,8 @@ CREATE TABLE IF NOT EXISTS balance_logs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   staff_id UUID REFERENCES staff(id) ON DELETE CASCADE NOT NULL,
   amount NUMERIC(10,2) NOT NULL,          -- positive = addition, negative = deduction
-  type TEXT CHECK (type IN ('chapter', 'deduct')) NOT NULL,
-  reason TEXT,                             -- required for deductions, optional for chapters
+  type TEXT CHECK (type IN ('chapter', 'deduct', 'bonus')) NOT NULL,
+  reason TEXT,                             -- required for deductions/bonus, optional for chapters
   reference_id UUID,                       -- links to chapter_logs.id when type='chapter'
   logged_by UUID REFERENCES staff(id) NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()

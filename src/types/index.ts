@@ -36,7 +36,7 @@ export interface BalanceLog {
   id: string;
   staff_id: string;
   amount: number;
-  type: 'chapter' | 'deduct';
+  type: 'chapter' | 'deduct' | 'bonus';
   reason: string | null;
   reference_id: string | null;
   logged_by: string;
@@ -59,10 +59,18 @@ export interface ChapterLogEmbedData {
   staffDiscordId: string;
   chapters: number[];
   point: number;
-  bonus: number;
   totalAdded: number;
   newBalance: number;
   note: string | null;
+}
+
+/** Data passed to bonus embed builder */
+export interface BonusEmbedData {
+  staffUsername: string;
+  staffDiscordId: string;
+  amount: number;
+  reason: string;
+  newBalance: number;
 }
 
 /** Data passed to deduction embed builder */

@@ -11,22 +11,26 @@ import { REST, Routes } from 'discord.js';
 import { env } from '../config/env.js';
 
 // Import command definitions
-import { data as chDoneCommand } from './ch_done.js';
+import { data as pointCommand } from './point.js';
+import { data as bonusCommand } from './bonus.js';
 import { data as deductCommand } from './deduct.js';
 import { data as staffStatCommand } from './staff_stat.js';
 import { data as helpCommand } from './help.js';
-import { data as staffAddCommand } from './staff_add.js';
+import { data as regCommand } from './reg.js';
 import { data as staffRemoveCommand } from './staff_remove.js';
 import { data as clearLogsCommand } from './clear_logs.js';
+import { data as contextLogCommand } from './context_log.js';
 
 const commands = [
-  chDoneCommand.toJSON(),
+  pointCommand.toJSON(),
+  bonusCommand.toJSON(),
   deductCommand.toJSON(),
   staffStatCommand.toJSON(),
   helpCommand.toJSON(),
-  staffAddCommand.toJSON(),
+  regCommand.toJSON(),
   staffRemoveCommand.toJSON(),
   clearLogsCommand.toJSON(),
+  contextLogCommand.toJSON(),
 ];
 
 async function registerCommands() {
