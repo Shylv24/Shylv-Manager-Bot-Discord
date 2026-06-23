@@ -33,8 +33,8 @@ export async function loadStaffCache(): Promise<void> {
   staffCache.clear();
   for (const row of data) {
     staffCache.set(row.discord_id, {
-      discordId: row.discord_id,
-      username: row.discord_username,
+      discord_id: row.discord_id,
+      discord_username: row.discord_username,
       role: row.role as 'admin' | 'staff',
     });
   }
@@ -56,8 +56,8 @@ export async function loadStaffCache(): Promise<void> {
 
     if (!insertError && newAdmin) {
       staffCache.set(MASTER_ADMIN_ID, {
-        discordId: MASTER_ADMIN_ID,
-        username: 'shylv24',
+        discord_id: MASTER_ADMIN_ID,
+        discord_username: 'shylv24',
         role: 'admin',
       });
       console.log('✅ Initial admin bootstrapped successfully!');
@@ -82,7 +82,7 @@ export function isAdmin(discordId: string): boolean {
 
 /** Add or update a staff member in the cache (called after DB insert) */
 export function updateStaffCache(staff: StaffConfig): void {
-  staffCache.set(staff.discordId, staff);
+  staffCache.set(staff.discord_id, staff);
 }
 
 /** Remove a staff member from the cache (called after DB deactivate) */

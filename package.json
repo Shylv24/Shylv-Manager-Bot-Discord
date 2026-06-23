@@ -1,6 +1,6 @@
 {
   "name": "shylv-manager-bot",
-  "version": "0.1.0",
+  "version": "0.5.1",
   "description": "Discord DM bot for scanlation team management — chapter tracking & balance management",
   "type": "module",
   "scripts": {

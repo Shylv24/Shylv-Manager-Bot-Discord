@@ -2,7 +2,7 @@
 
 import { EmbedBuilder } from 'discord.js';
 import { formatChapters } from './parser.js';
-import type { ChapterLogEmbedData, DeductEmbedData, StaffStats, BalanceLog } from '../types/index.js';
+import type { ChapterLogEmbedData, DeductEmbedData, StaffStats, BalanceLog, BonusEmbedData, Staff } from '../types/index.js';
 
 // ─── Color Palette ───
 const COLORS = {
@@ -54,7 +54,7 @@ export function createChapterLogEmbed(data: ChapterLogEmbedData): EmbedBuilder {
 
 // ─── Bonus Embed ───
 
-export function createBonusEmbed(data: import('../types/index.js').BonusEmbedData): EmbedBuilder {
+export function createBonusEmbed(data: BonusEmbedData): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setColor(COLORS.SUCCESS) // Bonus is positive, so SUCCESS color
     .setTitle('🎁 Bonus Added')
@@ -151,7 +151,7 @@ export function createStaffStatEmbed(stats: StaffStats): EmbedBuilder {
 
 // ─── Staff List Embed (Dashboard) ───
 
-export function createStaffListEmbed(staffList: import('../types/index.js').Staff[]): EmbedBuilder {
+export function createStaffListEmbed(staffList: Staff[]): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setColor(COLORS.INFO)
     .setTitle('🏆 Staff Leaderboard & Dashboard')
@@ -245,6 +245,11 @@ export function createHelpEmbed(isAdmin: boolean): EmbedBuilder {
       {
         name: '➖ `/staff_remove`',
         value: 'Deactivate a staff member.',
+        inline: false,
+      },
+      {
+        name: '🏆 `/staff_list`',
+        value: 'View leaderboard of all active staff balances.',
         inline: false,
       },
       {

@@ -17,7 +17,10 @@ import {
   type Interaction,
 } from 'discord.js';
 import { env } from './config/env.js';
-import { loadStaffCache } from './utils/staff_cache.js';
+import { loadStaffCache, isAdmin } from './utils/staff_cache.js';
+import { parseChapters } from './utils/parser.js';
+import { addChapterLog } from './database/queries.js';
+import { createChapterLogEmbed, createErrorEmbed } from './utils/embeds.js';
 
 import * as pointCommand from './commands/point.js';
 import * as bonusCommand from './commands/bonus.js';
@@ -117,7 +120,6 @@ client.on('interactionCreate', async (interaction: Interaction) => {
   } else if (interaction.isModalSubmit()) {
     if (interaction.customId.startsWith('log_points_modal_')) {
       // Verify admin permission (the context menu checks too, but this prevents crafted submissions)
-      const { isAdmin } = await import('./utils/staff_cache.js');
       if (!isAdmin(interaction.user.id)) {
         await interaction.reply({ content: 'You do not have permission to do this.', ephemeral: true });
         return;
@@ -136,10 +138,6 @@ client.on('interactionCreate', async (interaction: Interaction) => {
       }
 
       // We handle the rest using the logic from point command
-      const { parseChapters } = await import('./utils/parser.js');
-      const { addChapterLog } = await import('./database/queries.js');
-      const { createChapterLogEmbed, createErrorEmbed } = await import('./utils/embeds.js');
-
       const parseResult = parseChapters(chaptersInput);
       if (!parseResult.success) {
         await interaction.reply({ embeds: [createErrorEmbed(`Invalid chapter format: ${parseResult.error}`)], ephemeral: true });

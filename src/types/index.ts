@@ -11,12 +11,8 @@ export interface Staff {
   updated_at: string;
 }
 
-/** Staff config entry (hardcoded in config/staff.ts) */
-export interface StaffConfig {
-  discordId: string;
-  username: string;
-  role: 'admin' | 'staff';
-}
+/** Staff config entry (for in-memory cache) */
+export type StaffConfig = Pick<Staff, 'discord_id' | 'discord_username' | 'role'>;
 
 /** Chapter log record */
 export interface ChapterLog {

@@ -120,7 +120,6 @@ export async function addChapterLog(params: AddChapterLogParams): Promise<{
       staff_id: staff.id,
       chapters: params.chapters,
       point: params.point,
-      bonus: 0, // Bonus is now handled by a separate command
       total_added: totalAdded,
       note: params.note,
       logged_by: admin.id,

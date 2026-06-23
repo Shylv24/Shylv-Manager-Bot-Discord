@@ -1,7 +1,7 @@
 // ─── /deduct Command ─── Shylv Manager Bot ───
 //
 // Admin-only command to deduct balance from a staff member.
-// Usage: /deduct user:@Staff amount:5.00 reason:Pembayaran Juni
+// Usage: /deduct user:@Staff amount:5.00 reason:Payment for June
 //
 
 import {

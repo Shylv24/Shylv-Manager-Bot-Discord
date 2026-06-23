@@ -43,8 +43,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     // 4. Update memory cache
     updateStaffCache({
-      discordId: staffRecord.discord_id,
-      username: staffRecord.discord_username,
+      discord_id: staffRecord.discord_id,
+      discord_username: staffRecord.discord_username,
       role: staffRecord.role as 'admin' | 'staff',
     });
 
