@@ -1,0 +1,19 @@
+{
+  "name": "shylv-manager-bot",
+  "version": "0.1.0",
+  "description": "Discord DM bot for scanlation team management — chapter tracking & balance management",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "register": "bun run src/commands/register.ts"
+  },
+  "dependencies": {
+    "discord.js": "^14.18.0",
+    "@supabase/supabase-js": "^2.49.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.0"
+  }
+}
