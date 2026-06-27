@@ -1,6 +1,7 @@
 # AGENTS.md — Shylv Manager Bot Discord
 
 > Discord DM bot for scanlation team management (Bun + TypeScript + discord.js + Supabase).
+> **Read [`../../SYSTEM.md`](../../SYSTEM.md)** — shared PC/agent topology.
 > Human docs: [`README.md`](README.md) — Setup and deployment guide.
 > Always read [`PLANNING.md`](PLANNING.md) at the start of a new conversation for architecture and scope.
 > Before merging, run a review per `../../#PROMPT MASTER/PROMPT_REVIEW.md` and resolve all 🔴/🟡 findings.
