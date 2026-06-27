@@ -17,6 +17,14 @@
 
 *Note: Requires Bun v1.x and `.env` file with Discord and Supabase credentials.*
 
+## Repository & Local Paths
+
+| Item | Value |
+|------|-------|
+| **GitHub** | https://github.com/Shylv24/Shylv-Manager-Bot-Discord |
+| **Local path** | `D:\Shylv Projects\Dev\Bot\Shylv Manager Bot Discord` |
+| **Junction** | `C:\script\Bot\Shylv Manager Bot Discord` |
+
 ## Architecture & Project Structure
 
 ```
