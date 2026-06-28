@@ -22,7 +22,7 @@ Scanlation teams lack a simple, centralized way to track which chapters have bee
 ## Scope & Success Metrics
 
 ### In-scope (Phase 1 & 2)
-- Users can self-register as staff dynamically via `/reg`, and admin can remove staff via `/staff_remove`
+- Admins can add new staff/admins via `/staff_add`, and remove them via `/staff_remove`
 - Admin can delete logs and reset balances via `/clear_logs`
 - Admin can log completed chapters via `/point` command (single, range, comma-separated)
 - Admin can add bonuses via `/bonus` command (separate from chapter points)
@@ -63,7 +63,7 @@ Scanlation teams lack a simple, centralized way to track which chapters have bee
                               |
                      [Command Handler + Modal Handler]
                     /    |      |       |      |      |      \        \
-           /point  /bonus  /deduct  /staff_stat  /help  /reg  /clear_logs  /staff_list
+           /point  /bonus  /deduct  /staff_stat  /help  /staff_add  /clear_logs  /staff_list
            (admin) (admin) (admin)   (all)       (all)  (all) (admin)      (admin)
                               |
                      [Context Menu: "Log Points" (admin) → Modal]
@@ -120,7 +120,7 @@ Scanlation teams lack a simple, centralized way to track which chapters have bee
 - **No external database dependency:** SQLite file at `./data/shylv.db` — zero network latency, zero cloud costs
 - **Shared server required:** Admin, staff, and bot must share at least one Discord server for DM commands to work
 - **DM-only interaction:** All commands run in direct messages, not in servers
-- **Self-registration as staff only:** Users register via `/reg` (always staff role). Admin role promotion is done directly in the database for security
+- **Staff & Admin Management:** Admins can dynamically add staff and other admins via `/staff_add`. The bot owner is the protected Master Admin by default.
 - **Master Admin:** The initial admin Discord ID is configured via `MASTER_ADMIN_ID` in `.env` (never hardcoded in source)
 
 ### Assumptions
@@ -198,7 +198,7 @@ Enforcement details will live in AGENTS.md.
 ## Roadmap / Milestones
 
 - [x] Phase 1 — Foundation: Project setup, Discord bot connection, database schema, `/point`, `/deduct`, `/staff_stat`, `/help` commands working in DM.
-- [x] Phase 2 — Polish: Dynamic staff management via self-registration (`/reg`), admin removal (`/staff_remove`), deleting past records (`/clear_logs`), User Apps integration (usable everywhere).
+- [x] Phase 2 — Polish: Dynamic staff management via `/staff_add` and `/staff_remove`, deleting past records (`/clear_logs`), User Apps integration (usable everywhere).
 - [x] Phase 2.5 — Refactor & Dashboard: Separated `/bonus` from `/point`, added Context Menu "Log Points" with Modal, added `/staff_list` leaderboard, mobile-optimized embeds, ephemeral visibility controls, all text in English.
 - [x] Phase 2.6 — SQLite Migration: Migrated from Supabase PostgreSQL to local SQLite via bun:sqlite. Removed cloud dependency. All balance operations use transactions for atomicity.
 - [ ] Phase 3 — Multi-project: Add project/comic title support, per-project balance tracking, project-scoped stats. **Done when:** admin can assign chapters to specific comic titles.

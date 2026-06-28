@@ -87,7 +87,7 @@ export async function getAllActiveStaff(): Promise<Staff[]> {
 
 /**
  * Add or reactivate a staff member.
- * Called by /reg command.
+ * Called by /staff_add command.
  */
 export async function addStaff(discordId: string, username: string, role: 'admin' | 'staff'): Promise<Staff> {
   const db = getDb();

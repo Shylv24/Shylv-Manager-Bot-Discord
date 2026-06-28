@@ -38,7 +38,7 @@ Shylv Manager Bot/
 │   │   ├── staff_list.ts    # /staff_list — Leaderboard dashboard (admin)
 │   │   ├── staff_remove.ts  # /staff_remove — Deactivate staff (admin)
 │   │   ├── clear_logs.ts    # /clear_logs — Wipe logs (admin)
-│   │   ├── reg.ts           # /reg — Self-register as staff (all)
+│   │   ├── staff_add.ts     # /staff_add — Add staff or admin (admin)
 │   │   ├── help.ts          # /help — Show command list (all)
 │   │   ├── context_log.ts   # Context Menu "Log Points" + Modal (admin)
 │   │   └── register.ts      # Script to push commands to Discord API

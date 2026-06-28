@@ -202,11 +202,6 @@ export function createHelpEmbed(isAdmin: boolean): EmbedBuilder {
     .setDescription('Discord bot for scanlation team management — track chapters & balance.')
     .addFields(
       {
-        name: '✍️ `/reg`',
-        value: 'Register yourself as a staff member.',
-        inline: false,
-      },
-      {
         name: '📖 `/staff_stat`',
         value: 'View your statistics and balance history.\nAdmins can specify `user:@staff` to view others\' statistics.',
         inline: false,
@@ -240,6 +235,11 @@ export function createHelpEmbed(isAdmin: boolean): EmbedBuilder {
       {
         name: '💸 `/deduct`',
         value: 'Deduct balance.\n`user` (Staff), `amount` (Value), `reason` (Required)',
+        inline: false,
+      },
+      {
+        name: '➕ `/staff_add`',
+        value: 'Add a new staff or admin member.',
         inline: false,
       },
       {
