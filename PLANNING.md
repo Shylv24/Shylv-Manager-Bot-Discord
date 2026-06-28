@@ -8,16 +8,16 @@ related: [README.md, AGENTS.md, TASK.md]
 
 # PLANNING.md — Shylv Manager Bot Discord
 
-> A Discord DM-based bot for scanlation team management: tracking completed chapters and managing staff balance/payment records. Status: Phase 2.5 (Command Refactor & Dashboard). Read this first.
+> A Discord bot for scanlation team management (DM & Server compatible): tracking completed chapters and managing staff balance/payment records. Status: Phase 2.5 (Command Refactor & Dashboard). Read this first.
 > Human docs: README.md • Agent rules: AGENTS.md • Tasks: TASK.md
 
 ## Vision & Problem
 
 Scanlation teams lack a simple, centralized way to track which chapters have been completed by each staff member and how much balance (payment/credit) they have accumulated. Current workflows rely on manual spreadsheets or informal messages, leading to lost records, disputes, and administrative overhead.
 
-**Target users:** A scanlation team admin who manages staff payments/credits via Discord DMs. Staff members who want to check their own records.
+**Target users:** A scanlation team admin who manages staff payments/credits via Discord DMs or server channels. Staff members who want to check their own records.
 
-**Value proposition:** A Discord bot that lives in DMs, allowing the admin to log completed chapters and automatically calculate accumulated balance (points and separate bonuses), while giving staff members self-service access to view their own stats and history. The bot provides an auditable, always-available record that both parties can reference.
+**Value proposition:** A Discord bot that lives in Discord (DMs or servers), allowing the admin to log completed chapters and automatically calculate accumulated balance (points and separate bonuses), while giving staff members self-service access to view their own stats and history. The bot provides an auditable, always-available record that both parties can reference.
 
 ## Scope & Success Metrics
 
@@ -37,7 +37,7 @@ Scanlation teams lack a simple, centralized way to track which chapters have bee
 - Bot runs locally on admin's PC (no cloud hosting needed)
 
 ### Non-goals (explicitly NOT doing)
-- Server-based commands (all interactions are DM-only or User App contexts)
+- Multi-tenant isolated databases (user balance is global across all servers)
 - Multi-project/multi-comic support (structure will be prepared but not exposed)
 - Web dashboard or UI
 - Payment gateway integration
@@ -54,7 +54,7 @@ Scanlation teams lack a simple, centralized way to track which chapters have bee
 ## Architecture
 
 ```
-[Discord User DM] <---> [Discord API (Gateway WebSocket)]
+[Discord User (DM/Server)] <---> [Discord API (Gateway WebSocket)]
                               |
                      [Shylv Bot (Bun + TypeScript)]
                      [Running on Admin's Local PC]
@@ -75,7 +75,7 @@ Scanlation teams lack a simple, centralized way to track which chapters have bee
 **Pattern:** Simple layered architecture — Command Layer → Service Layer → Data Layer. Chosen for simplicity; the bot is a single long-running process with no need for microservices or event queues.
 
 **Data flow (admin logs chapter via `/point`):**
-1. Admin sends `/point user:@staff chapters:1-5 point:1.5` in DM to bot
+1. Admin sends `/point user:@staff chapters:1-5 point:1.5` in DM or server to bot
 2. Bot validates admin role, parses chapter input (range → [1,2,3,4,5])
 3. Bot inserts chapter records into SQLite `chapter_logs` table
 4. Bot calculates balance addition: `1.5 × 5 chapters = 7.50`
@@ -83,12 +83,12 @@ Scanlation teams lack a simple, centralized way to track which chapters have bee
 6. Bot replies with embed: chapters logged, point/ch, total added, new balance
 
 **Data flow (admin logs chapter via Context Menu):**
-1. Admin right-clicks staff profile in DM → Apps → "Log Points"
+1. Admin right-clicks staff profile → Apps → "Log Points"
 2. Bot shows a Modal popup (chapters, point, note fields)
 3. Same processing as `/point` above, but target user is auto-detected
 
 **Data flow (staff checks stats):**
-1. Staff sends `/staff_stat` in DM to bot
+1. Staff sends `/staff_stat` in DM or server to bot
 2. Bot looks up user by Discord ID in `staff` table
 3. Bot queries `chapter_logs` for that user
 4. Bot replies with embed: total chapters, total balance, last activity date, recent chapter list
@@ -119,7 +119,6 @@ Scanlation teams lack a simple, centralized way to track which chapters have bee
 - **Local hosting:** Bot runs on admin's PC; PC must be on for bot to respond. Data stored locally in SQLite file.
 - **No external database dependency:** SQLite file at `./data/shylv.db` — zero network latency, zero cloud costs
 - **Shared server required:** Admin, staff, and bot must share at least one Discord server for DM commands to work
-- **DM-only interaction:** All commands run in direct messages, not in servers
 - **Staff & Admin Management:** Admins can dynamically add staff and other admins via `/staff_add`. The bot owner is the protected Master Admin by default.
 - **Master Admin:** The initial admin Discord ID is configured via `MASTER_ADMIN_ID` in `.env` (never hardcoded in source)
 
@@ -197,7 +196,7 @@ Enforcement details will live in AGENTS.md.
 
 ## Roadmap / Milestones
 
-- [x] Phase 1 — Foundation: Project setup, Discord bot connection, database schema, `/point`, `/deduct`, `/staff_stat`, `/help` commands working in DM.
+- [x] Phase 1 — Foundation: Project setup, Discord bot connection, database schema, `/point`, `/deduct`, `/staff_stat`, `/help` commands working.
 - [x] Phase 2 — Polish: Dynamic staff management via `/staff_add` and `/staff_remove`, deleting past records (`/clear_logs`), User Apps integration (usable everywhere).
 - [x] Phase 2.5 — Refactor & Dashboard: Separated `/bonus` from `/point`, added Context Menu "Log Points" with Modal, added `/staff_list` leaderboard, mobile-optimized embeds, ephemeral visibility controls, all text in English.
 - [x] Phase 2.6 — SQLite Migration: Migrated from Supabase PostgreSQL to local SQLite via bun:sqlite. Removed cloud dependency. All balance operations use transactions for atomicity.

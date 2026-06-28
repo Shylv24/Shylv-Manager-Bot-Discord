@@ -10,6 +10,11 @@ dist/
 *.log
 .bun/
 
+
+AGENTS.md
+PLANNING.md
+REVIEW.md
+
 # Database
 data/
 

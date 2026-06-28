@@ -1,6 +1,6 @@
 // ─── Shylv Manager Bot ─── Entry Point ───
 //
-// Discord DM bot for scanlation team management.
+// Discord bot for scanlation team management.
 // Tracks completed chapters and manages staff balance.
 //
 // Usage:
@@ -92,7 +92,7 @@ client.once('ready', async (readyClient) => {
 
   console.log('');
   console.log('🟢 Bot is ready! Waiting for commands...');
-  console.log('   Users can DM the bot to use slash commands.');
+  console.log('   Users can use slash commands in DMs or server channels.');
   console.log('');
 });
 

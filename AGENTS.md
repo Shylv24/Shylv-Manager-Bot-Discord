@@ -1,6 +1,6 @@
 # AGENTS.md — Shylv Manager Bot Discord
 
-> Discord DM bot for scanlation team management (Bun + TypeScript + discord.js + SQLite).
+> Discord bot for scanlation team management (DM & Server compatible) (Bun + TypeScript + discord.js + SQLite).
 > **Read [`../../SYSTEM.md`](../../SYSTEM.md)** — shared PC/agent topology.
 > Human docs: [`README.md`](README.md) — Setup and deployment guide.
 > Always read [`PLANNING.md`](PLANNING.md) at the start of a new conversation for architecture and scope.
@@ -56,7 +56,7 @@ Shylv Manager Bot/
 └── package.json      # Bun scripts and dependencies
 ```
 
-**Data Flow:** Discord DM `->` Command Handler `->` Database Query (SQLite) `->` Embed Reply
+**Data Flow:** Discord DM/Server `->` Command Handler `->` Database Query (SQLite) `->` Embed Reply
 
 ## Code Style & Conventions
 
@@ -91,7 +91,7 @@ Shylv Manager Bot/
 - Modifying the SQLite database schema (`src/database/schema.sql` and `src/database/sqlite.ts`).
 - Adding new dependencies to `package.json`.
 - Changing the hosting strategy (currently local PC).
-- Changing the DM workflow (e.g., adding server-based commands).
+- Changing the command context workflow (e.g., restricting to specific server types).
 
 ### ⛔ Never (strictly forbidden)
 - Never commit `.env` or any real tokens/keys.

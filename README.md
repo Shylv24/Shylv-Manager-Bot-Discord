@@ -1,10 +1,10 @@
 # Shylv Manager Bot
 
-A Discord DM-based bot for scanlation team management. It allows admins to log completed chapters, add bonuses, and deduct balances while automatically tracking staff point balances in a local SQLite database.
+A Discord bot (DM & Server compatible) for scanlation team management. It allows admins to log completed chapters, add bonuses, and deduct balances while automatically tracking staff point balances in a local SQLite database.
 
 ## Features
 
-- **DM-First Interaction:** All slash commands are executed privately in Direct Messages or via User Apps.
+- **Universal Interaction:** All slash commands are executed seamlessly in Direct Messages, Server Channels, or via User Apps.
 - **Chapter Logging:** Log multiple chapters at once (e.g., `1-5`, `8,10`).
 - **Balance Calculation:** Automatically calculates balance based on points per chapter.
 - **Separate Bonus/Deduct Tracking:** Track non-chapter bonuses and deductions with required reasons.
