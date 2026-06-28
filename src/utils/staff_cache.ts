@@ -4,7 +4,7 @@
 // the database on every command interaction.
 //
 
-import { getSupabase } from '../database/supabase.js';
+import { getDb } from '../database/sqlite.js';
 import { env } from '../config/env.js';
 import type { StaffConfig } from '../types/index.js';
 
@@ -14,24 +14,19 @@ const staffCache = new Map<string, StaffConfig>();
 export const MASTER_ADMIN_ID = env.MASTER_ADMIN_ID;
 
 /**
- * Load active staff from Supabase into memory on boot.
+ * Load active staff from SQLite into memory on boot.
  * Call this once during bot startup.
  */
 export async function loadStaffCache(): Promise<void> {
   console.log('📋 Loading staff list from database...');
   
-  const { data, error } = await getSupabase()
-    .from('staff')
-    .select('discord_id, discord_username, role')
-    .eq('is_active', true);
-
-  if (error) {
-    console.error('❌ Failed to load staff from database:', error);
-    return;
-  }
+  const db = getDb();
+  const rows = db.query(
+    'SELECT discord_id, discord_username, role FROM staff WHERE is_active = 1'
+  ).all() as { discord_id: string; discord_username: string; role: string }[];
 
   staffCache.clear();
-  for (const row of data) {
+  for (const row of rows) {
     staffCache.set(row.discord_id, {
       discord_id: row.discord_id,
       discord_username: row.discord_username,
@@ -43,26 +38,30 @@ export async function loadStaffCache(): Promise<void> {
   // If the admin is not in the database yet, we insert them automatically.
   if (!staffCache.has(MASTER_ADMIN_ID)) {
     console.log('⚠️ Initial admin not found in DB. Bootstrapping...');
-    const { data: newAdmin, error: insertError } = await getSupabase()
-      .from('staff')
-      .upsert({
-        discord_id: MASTER_ADMIN_ID,
-        discord_username: 'shylv24',
-        role: 'admin',
-        is_active: true
-      }, { onConflict: 'discord_id' })
-      .select()
-      .single();
 
-    if (!insertError && newAdmin) {
+    const id = crypto.randomUUID();
+    try {
+      // Check if exists first (may be deactivated)
+      const existing = db.query('SELECT * FROM staff WHERE discord_id = ?').get(MASTER_ADMIN_ID);
+
+      if (existing) {
+        db.query(
+          "UPDATE staff SET role = 'admin', is_active = 1 WHERE discord_id = ?"
+        ).run(MASTER_ADMIN_ID);
+      } else {
+        db.query(
+          "INSERT INTO staff (id, discord_id, discord_username, role, is_active, balance) VALUES (?, ?, 'shylv24', 'admin', 1, 0)"
+        ).run(id, MASTER_ADMIN_ID);
+      }
+
       staffCache.set(MASTER_ADMIN_ID, {
         discord_id: MASTER_ADMIN_ID,
         discord_username: 'shylv24',
         role: 'admin',
       });
       console.log('✅ Initial admin bootstrapped successfully!');
-    } else {
-      console.error('❌ Failed to bootstrap initial admin:', insertError);
+    } catch (error) {
+      console.error('❌ Failed to bootstrap initial admin:', error);
     }
   }
 

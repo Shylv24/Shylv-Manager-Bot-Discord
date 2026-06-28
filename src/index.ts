@@ -17,6 +17,7 @@ import {
   type Interaction,
 } from 'discord.js';
 import { env } from './config/env.js';
+import { initDatabase, closeDatabase } from './database/sqlite.js';
 import { loadStaffCache, isAdmin } from './utils/staff_cache.js';
 import { parseChapters } from './utils/parser.js';
 import { addChapterLog } from './database/queries.js';
@@ -71,6 +72,15 @@ client.once('ready', async (readyClient) => {
   console.log(`  Servers: ${readyClient.guilds.cache.size}`);
   console.log('========================================');
   console.log('');
+
+  // Initialize SQLite database
+  try {
+    initDatabase();
+  } catch (error) {
+    console.error('❌ Failed to initialize database:', error);
+    console.error('   Bot cannot operate without a database. Shutting down.');
+    process.exit(1);
+  }
 
   // Load staff list from database to cache
   try {
@@ -183,6 +193,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
 function shutdown(signal: string) {
   console.log(`\n🔴 Received ${signal}. Shutting down gracefully...`);
   client.destroy();
+  closeDatabase();
   console.log('👋 Bot disconnected. Goodbye!');
   process.exit(0);
 }

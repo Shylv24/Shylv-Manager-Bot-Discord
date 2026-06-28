@@ -10,6 +10,9 @@ dist/
 *.log
 .bun/
 
+# Database
+data/
+
 # OS files
 .DS_Store
 Thumbs.db

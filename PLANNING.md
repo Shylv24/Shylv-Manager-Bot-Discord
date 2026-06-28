@@ -1,7 +1,7 @@
 ---
 status: active
-version: 0.5.1
-last_updated: 2026-06-24
+version: 0.6.0
+last_updated: 2026-06-28
 owners: [Agung Prasetyo (solo-dev / admin)]
 related: [README.md, AGENTS.md, TASK.md]
 ---
@@ -33,7 +33,7 @@ Scanlation teams lack a simple, centralized way to track which chapters have bee
 - Staff can view their own stats via `/staff_stat` (ephemeral/private by default); admin has `public` toggle
 - Bot responds with informative, compact embed messages optimized for mobile
 - Full balance history tracking (additions from chapters, bonuses, and deductions)
-- Persistent data storage in Supabase PostgreSQL
+- Persistent data storage in local SQLite database
 - Bot runs locally on admin's PC (no cloud hosting needed)
 
 ### Non-goals (explicitly NOT doing)
@@ -68,8 +68,8 @@ Scanlation teams lack a simple, centralized way to track which chapters have bee
                               |
                      [Context Menu: "Log Points" (admin) → Modal]
                               |
-                     [Supabase PostgreSQL]
-                     (persistent cloud storage)
+                     [SQLite Database]
+                     (local file: ./data/shylv.db)
 ```
 
 **Pattern:** Simple layered architecture — Command Layer → Service Layer → Data Layer. Chosen for simplicity; the bot is a single long-running process with no need for microservices or event queues.
@@ -77,7 +77,7 @@ Scanlation teams lack a simple, centralized way to track which chapters have bee
 **Data flow (admin logs chapter via `/point`):**
 1. Admin sends `/point user:@staff chapters:1-5 point:1.5` in DM to bot
 2. Bot validates admin role, parses chapter input (range → [1,2,3,4,5])
-3. Bot inserts chapter records into Supabase `chapter_logs` table
+3. Bot inserts chapter records into SQLite `chapter_logs` table
 4. Bot calculates balance addition: `1.5 × 5 chapters = 7.50`
 5. Bot updates user's `balance` in `staff` table
 6. Bot replies with embed: chapters logged, point/ch, total added, new balance
@@ -100,32 +100,31 @@ Scanlation teams lack a simple, centralized way to track which chapters have bee
 | Runtime | Bun | latest | Fast, built-in TypeScript support, lightweight; Node.js rejected (heavier, needs ts-node/tsx) |
 | Language | TypeScript | 5.x | Type safety for command parsing and data models; plain JS rejected (runtime errors in parsing logic) |
 | Discord Library | discord.js | 14.x | Most mature, best docs, slash command support; Eris rejected (less maintained) |
-| Database | Supabase (PostgreSQL) | Free tier | Managed, free, relational data fits well; SQLite rejected (not cloud-persistent across deploys) |
-| DB Client | @supabase/supabase-js | 2.x | Official client, simple API; raw pg rejected (more boilerplate) |
+| Database | SQLite (bun:sqlite) | built-in | Zero config, no network dependency, data lives with bot; Supabase rejected (unnecessary cloud dependency for local bot) |
+| DB Client | bun:sqlite | built-in | Bun's native SQLite module, zero external deps, synchronous, transaction-safe |
 | Hosting | Local PC (Windows) | — | Free, always available while PC is on; Railway rejected (free tier expires), Render rejected (sleeps after 15min idle) |
 
 ### Key Dependencies
 - `discord.js` — Discord API interaction, slash commands, embeds
-- `@supabase/supabase-js` — Supabase database client
+- `bun:sqlite` — Built-in SQLite database module (synchronous, transaction-safe, zero dependencies)
 
 
 ### Required Services
 - Discord Bot Application (via Discord Developer Portal)
-- Supabase Project (free tier — PostgreSQL database)
 
 ## Constraints & Assumptions
 
 ### Constraints
 - **Budget: $0** — All services must be on free tiers
-- **Local hosting:** Bot runs on admin's PC; PC must be on for bot to respond. Data is safe in Supabase regardless.
-- **Supabase free tier:** 500MB database, 2 projects max, 50K monthly active users
+- **Local hosting:** Bot runs on admin's PC; PC must be on for bot to respond. Data stored locally in SQLite file.
+- **No external database dependency:** SQLite file at `./data/shylv.db` — zero network latency, zero cloud costs
 - **Shared server required:** Admin, staff, and bot must share at least one Discord server for DM commands to work
 - **DM-only interaction:** All commands run in direct messages, not in servers
-- **Self-registration as staff only:** Users register via `/reg` (always staff role). Admin role promotion is done directly in Supabase database for security
+- **Self-registration as staff only:** Users register via `/reg` (always staff role). Admin role promotion is done directly in the database for security
 - **Master Admin:** The initial admin Discord ID is configured via `MASTER_ADMIN_ID` in `.env` (never hardcoded in source)
 
 ### Assumptions
-- Staff team is small (< 20 members) — free tier limits are sufficient
+- Staff team is small (< 20 members) — SQLite handles this easily
 - One user = one active project/comic for now (multi-project structure prepared in DB but not exposed in commands)
 - Admin is the bot owner / a single designated person
 - Chapter numbers are positive integers
@@ -136,7 +135,7 @@ Scanlation teams lack a simple, centralized way to track which chapters have bee
 - **Project structure:** Feature-based folders (`src/commands/`, `src/database/`, `src/types/`, `src/config/`, `src/utils/`)
 - **Command registration:** Discord slash commands registered globally (DM-compatible)
 - **Error handling:** All commands return user-friendly error embeds; errors logged to console
-- **Config:** Environment variables for secrets (bot token, Supabase URL/key); hardcoded user list in `src/config/staff.ts`
+- **Config:** Environment variables for secrets (bot token); hardcoded user list in `src/config/staff.ts`
 - **Naming:** camelCase for variables/functions, PascalCase for types/interfaces, UPPER_SNAKE for constants
 - **Embeds:** All bot responses use Discord embeds for clean, structured display
 
@@ -147,39 +146,39 @@ Enforcement details will live in AGENTS.md.
 ### `staff` table
 | Column | Type | Description |
 |---|---|---|
-| id | uuid (PK) | Auto-generated |
-| discord_id | text (unique) | Discord user ID |
-| discord_username | text | Display name for logging |
-| role | text | 'admin' or 'staff' |
-| is_active | boolean | True if currently active staff, False if removed |
-| balance | numeric(10,2) | Accumulated balance (point + bonus) |
-| created_at | timestamptz | Registration date |
-| updated_at | timestamptz | Last modification |
+| id | TEXT (PK) | UUID generated via `crypto.randomUUID()` |
+| discord_id | TEXT (unique) | Discord user ID |
+| discord_username | TEXT | Display name for logging |
+| role | TEXT | 'admin' or 'staff' |
+| is_active | INTEGER | 1 if currently active staff, 0 if removed |
+| balance | REAL | Accumulated balance (point + bonus) |
+| created_at | TEXT | ISO 8601 registration date |
+| updated_at | TEXT | ISO 8601 last modification |
 
 ### `chapter_logs` table
 | Column | Type | Description |
 |---|---|---|
-| id | uuid (PK) | Auto-generated |
-| staff_id | uuid (FK → staff.id) | Who completed the chapters |
-| chapters | integer[] | Array of chapter numbers logged in this entry |
-| point | numeric(10,2) | Point value for this entry |
-| bonus | numeric(10,2) | Bonus value for this entry |
-| total_added | numeric(10,2) | point + bonus (denormalized for quick display) |
-| note | text | Optional note/context |
-| logged_by | uuid (FK → staff.id) | Admin who logged this entry |
-| created_at | timestamptz | When this was logged |
+| id | TEXT (PK) | UUID generated via `crypto.randomUUID()` |
+| staff_id | TEXT (FK → staff.id) | Who completed the chapters |
+| chapters | TEXT | JSON-encoded array of chapter numbers (e.g., `"[1,2,3]"`) |
+| point | REAL | Point value for this entry |
+| bonus | REAL | Bonus value for this entry |
+| total_added | REAL | point + bonus (denormalized for quick display) |
+| note | TEXT | Optional note/context |
+| logged_by | TEXT (FK → staff.id) | Admin who logged this entry |
+| created_at | TEXT | ISO 8601 timestamp |
 
 ### `balance_logs` table
 | Column | Type | Description |
 |---|---|---|
-| id | uuid (PK) | Auto-generated |
-| staff_id | uuid (FK → staff.id) | Whose balance changed |
-| amount | numeric(10,2) | Change amount (+positive or -negative) |
-| type | text | 'chapter', 'deduct', or 'bonus' |
-| reason | text | Required for deductions/bonuses, optional for chapters |
-| reference_id | uuid (FK → chapter_logs.id) | Links to chapter_logs when type='chapter' |
-| logged_by | uuid (FK → staff.id) | Admin who made the change |
-| created_at | timestamptz | When this was logged |
+| id | TEXT (PK) | UUID generated via `crypto.randomUUID()` |
+| staff_id | TEXT (FK → staff.id) | Whose balance changed |
+| amount | REAL | Change amount (+positive or -negative) |
+| type | TEXT | 'chapter', 'deduct', or 'bonus' |
+| reason | TEXT | Required for deductions/bonuses, optional for chapters |
+| reference_id | TEXT (FK → chapter_logs.id) | Links to chapter_logs when type='chapter' |
+| logged_by | TEXT (FK → staff.id) | Admin who made the change |
+| created_at | TEXT | ISO 8601 timestamp |
 
 ### Relationships
 - `staff` 1 ←→ N `chapter_logs` (via staff_id)
@@ -195,13 +194,13 @@ Enforcement details will live in AGENTS.md.
 | Integration | Purpose | Auth | Failure handling |
 |---|---|---|---|
 | Discord API | Bot gateway + slash commands | Bot token (env var) | Reconnect on disconnect; log errors |
-| Supabase | PostgreSQL data storage | Anon key + URL (env vars) | Retry on transient errors; return error embed to user |
 
 ## Roadmap / Milestones
 
-- [x] Phase 1 — Foundation: Project setup, Discord bot connection, Supabase schema, `/point`, `/deduct`, `/staff_stat`, `/help` commands working in DM.
+- [x] Phase 1 — Foundation: Project setup, Discord bot connection, database schema, `/point`, `/deduct`, `/staff_stat`, `/help` commands working in DM.
 - [x] Phase 2 — Polish: Dynamic staff management via self-registration (`/reg`), admin removal (`/staff_remove`), deleting past records (`/clear_logs`), User Apps integration (usable everywhere).
 - [x] Phase 2.5 — Refactor & Dashboard: Separated `/bonus` from `/point`, added Context Menu "Log Points" with Modal, added `/staff_list` leaderboard, mobile-optimized embeds, ephemeral visibility controls, all text in English.
+- [x] Phase 2.6 — SQLite Migration: Migrated from Supabase PostgreSQL to local SQLite via bun:sqlite. Removed cloud dependency. All balance operations use transactions for atomicity.
 - [ ] Phase 3 — Multi-project: Add project/comic title support, per-project balance tracking, project-scoped stats. **Done when:** admin can assign chapters to specific comic titles.
 - [ ] Phase 4 — Advanced: Export data (CSV), monthly summaries. **Done when:** admin can export records and view summaries.
 
@@ -209,20 +208,22 @@ Enforcement details will live in AGENTS.md.
 
 | Risk | Likelihood/Impact | Mitigation |
 |---|---|---|
-| PC downtime = bot offline | Medium/Medium | Data safe in Supabase; bot auto-recovers on restart |
-| Supabase free tier limits hit | Low/Medium | Staff < 20, data is small; monitor usage |
+| PC downtime = bot offline + data inaccessible | Medium/Medium | Data stored locally; recommend periodic manual backup of `data/shylv.db` |
+| SQLite file corruption | Low/High | WAL mode enabled for crash resilience; periodic backups recommended |
 | Bot token leaked | Low/Critical | Store in env vars only; never commit to repo |
-| Data loss on Supabase free tier | Low/High | Free tier has daily backups; consider periodic CSV exports |
+| Data loss from disk failure | Low/High | Recommend copying `data/shylv.db` to external storage periodically |
 
 | Debt | Why it exists | Payoff plan |
 |---|---|---|
 | `any` type used for command registry Map | Needed to support both ChatInput and ContextMenu commands | Refactor with union type or overloaded handler |
 | No multi-project support | Not needed yet, team works on one project | Phase 3: add project entity |
+| Query functions are async but SQLite is sync | Kept async signatures for drop-in replacement from Supabase migration | Can refactor to sync when convenient |
 
 ## Open Questions & Decision Changelog
 
 ### Open Questions
 - **[Resolved]** Balance deductions: Implemented via `/deduct` command with mandatory reason.
+- **[Resolved]** Database: Migrated from Supabase to SQLite for zero-dependency local operation.
 - **[Non-blocking]** Should the bot support editing/deleting past chapter records? (Admin correction feature)
 - **[Non-blocking]** Should the bot send periodic summary DMs to staff (weekly/monthly)?
 
@@ -233,3 +234,4 @@ Enforcement details will live in AGENTS.md.
 | 2026-06-23 | v0.3.0: Local hosting, /deduct command, balance_logs table | User feedback: Railway not permanent, need deduction tracking |
 | 2026-06-24 | v0.5.0: Refactored /ch_done→/point, separated /bonus, added Context Menu "Log Points", /staff_list dashboard, mobile-optimized embeds, English-only text, ephemeral visibility for staff_stat | Command UX improvements and admin dashboard |
 | 2026-06-24 | v0.5.1: Moved MASTER_ADMIN_ID to .env, added admin check on modal submit, fixed bonus label in balance history | REVIEW.md audit fixes |
+| 2026-06-28 | v0.6.0: Migrated from Supabase PostgreSQL to local SQLite (better-sqlite3). Removed cloud dependency. All balance operations use transactions. | Eliminate cloud dependency, simplify setup, zero-cost operation |

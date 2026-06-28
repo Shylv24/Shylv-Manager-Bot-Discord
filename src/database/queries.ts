@@ -1,41 +1,88 @@
 // ─── Database Queries ─── Shylv Manager Bot ───
+//
+// All database operations using bun:sqlite.
+// Uses transactions for balance updates to ensure consistency.
+// chapters field: stored as JSON string "[1,2,3]", parsed on read.
+//
 
-import { getSupabase } from './supabase.js';
+import { getDb } from './sqlite.js';
 import type { Staff, ChapterLog, BalanceLog, StaffStats, StaffConfig } from '../types/index.js';
+
+// ─── Helpers ───
+
+/** Generate a UUID v4 string */
+function uuid(): string {
+  return crypto.randomUUID();
+}
+
+/** Parse chapters JSON string back to number array */
+function parseChaptersJson(json: string): number[] {
+  try {
+    return JSON.parse(json);
+  } catch {
+    return [];
+  }
+}
+
+/** Convert SQLite row to Staff interface */
+function rowToStaff(row: Record<string, unknown>): Staff {
+  return {
+    id: row.id as string,
+    discord_id: row.discord_id as string,
+    discord_username: row.discord_username as string,
+    role: row.role as 'admin' | 'staff',
+    balance: row.balance as number,
+    created_at: row.created_at as string,
+    updated_at: row.updated_at as string,
+  };
+}
+
+/** Convert SQLite row to ChapterLog interface (parse chapters JSON) */
+function rowToChapterLog(row: Record<string, unknown>): ChapterLog {
+  return {
+    id: row.id as string,
+    staff_id: row.staff_id as string,
+    chapters: parseChaptersJson(row.chapters as string),
+    point: row.point as number,
+    bonus: row.bonus as number,
+    total_added: row.total_added as number,
+    note: (row.note as string) || null,
+    logged_by: row.logged_by as string,
+    created_at: row.created_at as string,
+  };
+}
+
+/** Convert SQLite row to BalanceLog interface */
+function rowToBalanceLog(row: Record<string, unknown>): BalanceLog {
+  return {
+    id: row.id as string,
+    staff_id: row.staff_id as string,
+    amount: row.amount as number,
+    type: row.type as 'chapter' | 'deduct' | 'bonus',
+    reason: (row.reason as string) || null,
+    reference_id: (row.reference_id as string) || null,
+    logged_by: row.logged_by as string,
+    created_at: row.created_at as string,
+  };
+}
 
 // ─── Staff Queries ───
 
 /** Find a staff member by their Discord ID */
 export async function findStaffByDiscordId(discordId: string): Promise<Staff | null> {
-  const { data, error } = await getSupabase()
-    .from('staff')
-    .select('*')
-    .eq('discord_id', discordId)
-    .single();
+  const db = getDb();
+  const row = db.query('SELECT * FROM staff WHERE discord_id = ?').get(discordId) as Record<string, unknown> | null;
 
-  if (error && error.code !== 'PGRST116') {
-    // PGRST116 = "no rows returned" which is expected when user not found
-    console.error('Error finding staff:', error);
-    throw new Error('Database error while finding staff member.');
-  }
-
-  return data as Staff | null;
+  if (!row) return null;
+  return rowToStaff(row);
 }
 
 /** Get all active staff members, ordered by balance descending */
 export async function getAllActiveStaff(): Promise<Staff[]> {
-  const { data, error } = await getSupabase()
-    .from('staff')
-    .select('*')
-    .eq('is_active', true)
-    .order('balance', { ascending: false });
+  const db = getDb();
+  const rows = db.query('SELECT * FROM staff WHERE is_active = 1 ORDER BY balance DESC').all() as Record<string, unknown>[];
 
-  if (error) {
-    console.error('Error fetching all active staff:', error);
-    throw new Error('Database error while fetching staff list.');
-  }
-
-  return (data || []) as Staff[];
+  return rows.map(rowToStaff);
 }
 
 /**
@@ -43,28 +90,28 @@ export async function getAllActiveStaff(): Promise<Staff[]> {
  * Called by /reg command.
  */
 export async function addStaff(discordId: string, username: string, role: 'admin' | 'staff'): Promise<Staff> {
-  const supabase = getSupabase();
+  const db = getDb();
+  const id = uuid();
 
-  const { data, error } = await supabase
-    .from('staff')
-    .upsert(
-      {
-        discord_id: discordId,
-        discord_username: username,
-        role: role,
-        is_active: true, // reactivate if they were deactivated
-      },
-      { onConflict: 'discord_id' }
-    )
-    .select()
-    .single();
+  // Check if user exists
+  const existing = db.query('SELECT * FROM staff WHERE discord_id = ?').get(discordId) as Record<string, unknown> | null;
 
-  if (error || !data) {
-    console.error(`Error adding staff ${username}:`, error);
-    throw new Error('Database error while adding staff member.');
+  if (existing) {
+    // Reactivate existing user
+    db.query(
+      'UPDATE staff SET discord_username = ?, role = ?, is_active = 1 WHERE discord_id = ?'
+    ).run(username, role, discordId);
+  } else {
+    // Insert new user
+    db.query(
+      'INSERT INTO staff (id, discord_id, discord_username, role, is_active, balance) VALUES (?, ?, ?, ?, 1, 0)'
+    ).run(id, discordId, username, role);
   }
 
-  return data as Staff;
+  const row = db.query('SELECT * FROM staff WHERE discord_id = ?').get(discordId) as Record<string, unknown> | null;
+  if (!row) throw new Error('Database error while adding staff member.');
+
+  return rowToStaff(row);
 }
 
 /**
@@ -72,15 +119,10 @@ export async function addStaff(discordId: string, username: string, role: 'admin
  * Called by /staff_remove command.
  */
 export async function deactivateStaff(discordId: string): Promise<void> {
-  const supabase = getSupabase();
+  const db = getDb();
+  const result = db.query('UPDATE staff SET is_active = 0 WHERE discord_id = ?').run(discordId);
 
-  const { error } = await supabase
-    .from('staff')
-    .update({ is_active: false })
-    .eq('discord_id', discordId);
-
-  if (error) {
-    console.error(`Error deactivating staff ${discordId}:`, error);
+  if (result.changes === 0) {
     throw new Error('Database error while deactivating staff member.');
   }
 }
@@ -97,13 +139,14 @@ interface AddChapterLogParams {
 
 /**
  * Add a chapter log record, create balance log, and update staff balance.
+ * All three operations wrapped in a transaction for atomicity.
  * Returns the updated staff record and the chapter log.
  */
 export async function addChapterLog(params: AddChapterLogParams): Promise<{
   staff: Staff;
   chapterLog: ChapterLog;
 }> {
-  const supabase = getSupabase();
+  const db = getDb();
   const totalAdded = params.point;
 
   // Get staff and admin records
@@ -113,59 +156,55 @@ export async function addChapterLog(params: AddChapterLogParams): Promise<{
   const admin = await findStaffByDiscordId(params.loggedByDiscordId);
   if (!admin) throw new Error('Admin not found in database.');
 
-  // 1. Insert chapter log
-  const { data: chapterLog, error: chapterError } = await supabase
-    .from('chapter_logs')
-    .insert({
-      staff_id: staff.id,
-      chapters: params.chapters,
-      point: params.point,
-      total_added: totalAdded,
-      note: params.note,
-      logged_by: admin.id,
-    })
-    .select()
-    .single();
-
-  if (chapterError || !chapterLog) {
-    console.error('Error inserting chapter log:', chapterError);
-    throw new Error('Failed to insert chapter log.');
-  }
-
-  // 2. Insert balance log
-  const { error: balanceLogError } = await supabase
-    .from('balance_logs')
-    .insert({
-      staff_id: staff.id,
-      amount: totalAdded,
-      type: 'chapter',
-      reason: null,
-      reference_id: chapterLog.id,
-      logged_by: admin.id,
-    });
-
-  if (balanceLogError) {
-    console.error('Error inserting balance log:', balanceLogError);
-    // Don't throw — chapter log was already created
-  }
-
-  // 3. Update staff balance
+  const chapterLogId = uuid();
+  const balanceLogId = uuid();
   const newBalance = Number(staff.balance) + totalAdded;
-  const { data: updatedStaff, error: updateError } = await supabase
-    .from('staff')
-    .update({ balance: newBalance })
-    .eq('id', staff.id)
-    .select()
-    .single();
 
-  if (updateError || !updatedStaff) {
-    console.error('Error updating balance:', updateError);
-    throw new Error('Failed to update staff balance.');
+  // Transaction: insert chapter_log + insert balance_log + update balance
+  const transaction = db.transaction(() => {
+    // 1. Insert chapter log
+    db.query(
+      `INSERT INTO chapter_logs (id, staff_id, chapters, point, total_added, note, logged_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      chapterLogId,
+      staff.id,
+      JSON.stringify(params.chapters),
+      params.point,
+      totalAdded,
+      params.note,
+      admin.id
+    );
+
+    // 2. Insert balance log
+    db.query(
+      `INSERT INTO balance_logs (id, staff_id, amount, type, reason, reference_id, logged_by)
+       VALUES (?, ?, ?, 'chapter', NULL, ?, ?)`
+    ).run(
+      balanceLogId,
+      staff.id,
+      totalAdded,
+      chapterLogId,
+      admin.id
+    );
+
+    // 3. Update staff balance
+    db.query('UPDATE staff SET balance = ? WHERE id = ?').run(newBalance, staff.id);
+  });
+
+  transaction();
+
+  // Fetch updated records
+  const updatedStaffRow = db.query('SELECT * FROM staff WHERE id = ?').get(staff.id) as Record<string, unknown> | null;
+  const chapterLogRow = db.query('SELECT * FROM chapter_logs WHERE id = ?').get(chapterLogId) as Record<string, unknown> | null;
+
+  if (!updatedStaffRow || !chapterLogRow) {
+    throw new Error('Failed to retrieve records after chapter log insert.');
   }
 
   return {
-    staff: updatedStaff as Staff,
-    chapterLog: chapterLog as ChapterLog,
+    staff: rowToStaff(updatedStaffRow),
+    chapterLog: rowToChapterLog(chapterLogRow),
   };
 }
 
@@ -181,7 +220,7 @@ interface AddBonusParams {
  * Returns the updated staff record.
  */
 export async function addBonusLog(params: AddBonusParams): Promise<Staff> {
-  const supabase = getSupabase();
+  const db = getDb();
 
   const staff = await findStaffByDiscordId(params.staffDiscordId);
   if (!staff) throw new Error('Staff member not found in database.');
@@ -189,38 +228,31 @@ export async function addBonusLog(params: AddBonusParams): Promise<Staff> {
   const admin = await findStaffByDiscordId(params.loggedByDiscordId);
   if (!admin) throw new Error('Admin not found in database.');
 
-  // 1. Insert balance log (positive amount)
-  const { error: balanceLogError } = await supabase
-    .from('balance_logs')
-    .insert({
-      staff_id: staff.id,
-      amount: params.amount,
-      type: 'bonus',
-      reason: params.reason,
-      reference_id: null,
-      logged_by: admin.id,
-    });
-
-  if (balanceLogError) {
-    console.error('Error inserting bonus log:', balanceLogError);
-    throw new Error('Failed to log bonus.');
-  }
-
-  // 2. Update staff balance
+  const balanceLogId = uuid();
   const newBalance = Number(staff.balance) + params.amount;
-  const { data: updatedStaff, error: updateError } = await supabase
-    .from('staff')
-    .update({ balance: newBalance })
-    .eq('id', staff.id)
-    .select()
-    .single();
 
-  if (updateError || !updatedStaff) {
-    console.error('Error updating balance:', updateError);
-    throw new Error('Failed to update staff balance.');
-  }
+  // Transaction: insert balance_log + update balance
+  const transaction = db.transaction(() => {
+    db.query(
+      `INSERT INTO balance_logs (id, staff_id, amount, type, reason, reference_id, logged_by)
+       VALUES (?, ?, ?, 'bonus', ?, NULL, ?)`
+    ).run(
+      balanceLogId,
+      staff.id,
+      params.amount,
+      params.reason,
+      admin.id
+    );
 
-  return updatedStaff as Staff;
+    db.query('UPDATE staff SET balance = ? WHERE id = ?').run(newBalance, staff.id);
+  });
+
+  transaction();
+
+  const updatedRow = db.query('SELECT * FROM staff WHERE id = ?').get(staff.id) as Record<string, unknown> | null;
+  if (!updatedRow) throw new Error('Failed to update staff balance.');
+
+  return rowToStaff(updatedRow);
 }
 
 // ─── Deduction Queries ───
@@ -237,7 +269,7 @@ interface AddDeductionParams {
  * Returns the updated staff record.
  */
 export async function addDeduction(params: AddDeductionParams): Promise<Staff> {
-  const supabase = getSupabase();
+  const db = getDb();
 
   const staff = await findStaffByDiscordId(params.staffDiscordId);
   if (!staff) throw new Error('Staff member not found in database.');
@@ -245,97 +277,69 @@ export async function addDeduction(params: AddDeductionParams): Promise<Staff> {
   const admin = await findStaffByDiscordId(params.loggedByDiscordId);
   if (!admin) throw new Error('Admin not found in database.');
 
-  // 1. Insert balance log (negative amount)
-  const { error: balanceLogError } = await supabase
-    .from('balance_logs')
-    .insert({
-      staff_id: staff.id,
-      amount: -params.amount,
-      type: 'deduct',
-      reason: params.reason,
-      reference_id: null,
-      logged_by: admin.id,
-    });
-
-  if (balanceLogError) {
-    console.error('Error inserting deduction log:', balanceLogError);
-    throw new Error('Failed to log deduction.');
-  }
-
-  // 2. Update staff balance
+  const balanceLogId = uuid();
   const newBalance = Number(staff.balance) - params.amount;
-  const { data: updatedStaff, error: updateError } = await supabase
-    .from('staff')
-    .update({ balance: newBalance })
-    .eq('id', staff.id)
-    .select()
-    .single();
 
-  if (updateError || !updatedStaff) {
-    console.error('Error updating balance:', updateError);
-    throw new Error('Failed to update staff balance.');
-  }
+  // Transaction: insert balance_log + update balance
+  const transaction = db.transaction(() => {
+    db.query(
+      `INSERT INTO balance_logs (id, staff_id, amount, type, reason, reference_id, logged_by)
+       VALUES (?, ?, ?, 'deduct', ?, NULL, ?)`
+    ).run(
+      balanceLogId,
+      staff.id,
+      -params.amount, // negative for deductions
+      params.reason,
+      admin.id
+    );
 
-  return updatedStaff as Staff;
+    db.query('UPDATE staff SET balance = ? WHERE id = ?').run(newBalance, staff.id);
+  });
+
+  transaction();
+
+  const updatedRow = db.query('SELECT * FROM staff WHERE id = ?').get(staff.id) as Record<string, unknown> | null;
+  if (!updatedRow) throw new Error('Failed to update staff balance.');
+
+  return rowToStaff(updatedRow);
 }
 
 // ─── Stats Queries ───
 
 /** Get comprehensive stats for a staff member */
 export async function getStaffStats(discordId: string): Promise<StaffStats> {
-  const supabase = getSupabase();
+  const db = getDb();
 
   const staff = await findStaffByDiscordId(discordId);
   if (!staff) throw new Error('Staff member not found in database.');
 
-  // Get total chapters count (sum of all chapter arrays)
-  const { data: chapterLogs, error: chapError } = await supabase
-    .from('chapter_logs')
-    .select('chapters, created_at')
-    .eq('staff_id', staff.id)
-    .order('created_at', { ascending: false });
+  // Get all chapter logs for total count
+  const chapterLogs = db.query(
+    'SELECT chapters, created_at FROM chapter_logs WHERE staff_id = ? ORDER BY created_at DESC'
+  ).all(staff.id) as Record<string, unknown>[];
 
-  if (chapError) {
-    console.error('Error fetching chapter logs:', chapError);
-    throw new Error('Failed to fetch chapter logs.');
-  }
-
-  const allChapters = (chapterLogs || []).flatMap((log: { chapters: number[] }) => log.chapters);
+  const allChapters = chapterLogs.flatMap((log) => parseChaptersJson(log.chapters as string));
   const totalChapters = new Set(allChapters).size; // unique chapters
-  const totalChapterLogs = (chapterLogs || []).length;
-  const lastActive = chapterLogs && chapterLogs.length > 0 ? chapterLogs[0].created_at : null;
+  const totalChapterLogs = chapterLogs.length;
+  const lastActive = chapterLogs.length > 0 ? (chapterLogs[0].created_at as string) : null;
 
   // Get recent chapter logs (last 10)
-  const { data: recentChapters, error: recentChapError } = await supabase
-    .from('chapter_logs')
-    .select('*')
-    .eq('staff_id', staff.id)
-    .order('created_at', { ascending: false })
-    .limit(10);
-
-  if (recentChapError) {
-    console.error('Error fetching recent chapter logs:', recentChapError);
-  }
+  const recentChapterRows = db.query(
+    'SELECT * FROM chapter_logs WHERE staff_id = ? ORDER BY created_at DESC LIMIT 10'
+  ).all(staff.id) as Record<string, unknown>[];
 
   // Get recent balance logs (last 10)
-  const { data: recentBalance, error: recentBalError } = await supabase
-    .from('balance_logs')
-    .select('*')
-    .eq('staff_id', staff.id)
-    .order('created_at', { ascending: false })
-    .limit(10);
-
-  if (recentBalError) {
-    console.error('Error fetching recent balance logs:', recentBalError);
-  }
+  const recentBalanceRows = db.query(
+    'SELECT * FROM balance_logs WHERE staff_id = ? ORDER BY created_at DESC LIMIT 10'
+  ).all(staff.id) as Record<string, unknown>[];
 
   return {
     staff,
     totalChapters,
     totalChapterLogs,
     lastActive,
-    recentChapterLogs: (recentChapters || []) as ChapterLog[],
-    recentBalanceLogs: (recentBalance || []) as BalanceLog[],
+    recentChapterLogs: recentChapterRows.map(rowToChapterLog),
+    recentBalanceLogs: recentBalanceRows.map(rowToBalanceLog),
   };
 }
 
@@ -350,41 +354,24 @@ export async function clearUserLogs(
   logType: 'chapter' | 'balance' | 'all',
   resetBalance: boolean
 ): Promise<void> {
-  const supabase = getSupabase();
+  const db = getDb();
   
   const staff = await findStaffByDiscordId(staffDiscordId);
   if (!staff) throw new Error('Staff member not found in database.');
 
-  if (logType === 'chapter' || logType === 'all') {
-    const { error } = await supabase
-      .from('chapter_logs')
-      .delete()
-      .eq('staff_id', staff.id);
-    if (error) {
-      console.error('Error deleting chapter logs:', error);
-      throw new Error('Failed to delete chapter logs.');
+  const transaction = db.transaction(() => {
+    if (logType === 'chapter' || logType === 'all') {
+      db.query('DELETE FROM chapter_logs WHERE staff_id = ?').run(staff.id);
     }
-  }
 
-  if (logType === 'balance' || logType === 'all') {
-    const { error } = await supabase
-      .from('balance_logs')
-      .delete()
-      .eq('staff_id', staff.id);
-    if (error) {
-      console.error('Error deleting balance logs:', error);
-      throw new Error('Failed to delete balance logs.');
+    if (logType === 'balance' || logType === 'all') {
+      db.query('DELETE FROM balance_logs WHERE staff_id = ?').run(staff.id);
     }
-  }
 
-  if (resetBalance) {
-    const { error } = await supabase
-      .from('staff')
-      .update({ balance: 0 })
-      .eq('id', staff.id);
-    if (error) {
-      console.error('Error resetting staff balance:', error);
-      throw new Error('Failed to reset staff balance.');
+    if (resetBalance) {
+      db.query('UPDATE staff SET balance = 0 WHERE id = ?').run(staff.id);
     }
-  }
+  });
+
+  transaction();
 }

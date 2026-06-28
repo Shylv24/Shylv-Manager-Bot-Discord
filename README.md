@@ -1,6 +1,6 @@
 # Shylv Manager Bot
 
-A Discord DM-based bot for scanlation team management. It allows admins to log completed chapters, add bonuses, and deduct balances while automatically tracking staff point balances in a Supabase PostgreSQL database.
+A Discord DM-based bot for scanlation team management. It allows admins to log completed chapters, add bonuses, and deduct balances while automatically tracking staff point balances in a local SQLite database.
 
 ## Features
 
@@ -10,12 +10,12 @@ A Discord DM-based bot for scanlation team management. It allows admins to log c
 - **Separate Bonus/Deduct Tracking:** Track non-chapter bonuses and deductions with required reasons.
 - **Leaderboard & Stats:** Admins can view a leaderboard (`/staff_list`), and staff can check their own stats (`/staff_stat`).
 - **Context Menu:** Right-click a user -> Apps -> "Log Points" to easily open a logging modal without typing their username.
+- **Zero Cloud Dependency:** All data stored locally in SQLite — no external database service required.
 
 ## Prerequisites
 
 - [Bun](https://bun.sh/) v1.x or later
 - A Discord Bot Application (Create one at the [Discord Developer Portal](https://discord.com/developers/applications))
-- A Supabase Project for the PostgreSQL database (Create one at [Supabase](https://supabase.com/))
 
 ## Setup & Installation
 
@@ -24,17 +24,14 @@ A Discord DM-based bot for scanlation team management. It allows admins to log c
    ```bash
    bun install
    ```
-3. **Database Setup:**
-   Run the SQL script located at `src/database/schema.sql` in your Supabase SQL editor to create the necessary tables and constraints.
-4. **Environment Variables:**
+3. **Environment Variables:**
    Copy `.env.example` (if exists) or create a new `.env` file in the root directory:
    ```env
    DISCORD_TOKEN=your_bot_token_here
    DISCORD_CLIENT_ID=your_bot_client_id_here
-   SUPABASE_URL=your_supabase_project_url
-   SUPABASE_ANON_KEY=your_supabase_anon_key
    MASTER_ADMIN_ID=your_discord_user_id
    ```
+4. **Database:** No manual setup required! The SQLite database is automatically created at `./data/shylv.db` on first bot startup.
 
 ## Running the Bot
 
@@ -55,12 +52,16 @@ Before using the bot for the first time, you must register the slash commands an
 bun run register
 ```
 
+## Backup
+
+The database file is stored at `./data/shylv.db`. To back up your data, simply copy this file to a safe location periodically.
+
 ## Tech Stack
 
 - Runtime: Bun
 - Language: TypeScript
 - Discord Library: discord.js
-- Database: Supabase (PostgreSQL)
+- Database: SQLite (bun:sqlite — built-in)
 
 ## Documentation
 
